@@ -1,0 +1,18 @@
+{
+  "name": "factory-puzzle",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "web": "node -e \"console.error('No Expo app yet — that is Phase 2 (21 Aug). See docs/roadmap.md.'); process.exit(1)\""
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}

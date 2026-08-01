@@ -1,0 +1,14 @@
+{
+  "id": "001",
+  "grid": { "width": 7, "height": 7 },
+  "sources": [{ "pos": [0, 3], "rotation": 0, "emits": "circle" }],
+  "sinks": [{ "pos": [6, 3], "rotation": 0 }],
+  "target": { "type": "widget", "count": 5 },
+  "max_ticks": 300,
+  "available": ["conveyor", "splitter", "press", "assembler"],
+  "recipes": {
+    "press": { "circle": "disc" },
+    "assembler": [{ "in": ["disc", "disc"], "out": "widget" }]
+  },
+  "par": 21
+}
