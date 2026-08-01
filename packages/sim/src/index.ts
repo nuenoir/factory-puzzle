@@ -1,14 +1,61 @@
 /**
- * The headless factory simulator.
+ * The headless factory simulator — public surface.
  *
- * Nothing is implemented yet — Phase 1 starts here, tests first.
- * The contract is `simulate(level, solution) => SimResult`, defined in
- * docs/rules-spec.md §13. The twelve tests it must pass are in §14.
+ * `simulate(level, solution)` is the contract in docs/rules-spec.md §13, and
+ * the twelve tests it must pass are §14. Beneath it sits a stepping API
+ * (`createWorld` + `step` + `snapshot`) because five scalars cannot express
+ * per-tick assertions, and Phase 2's animation will need the same view.
  *
  * This package must never import React, Expo, the DOM, or anything from app/.
- * It is both the game engine and the Phase 3 puzzle validator; a rendering
- * import here kills headless batch validation and takes Phase 3 with it.
+ * It is both the game engine and the Phase 3 validator; a rendering import
+ * here kills headless batch validation and takes Phase 3 with it.
  */
 
 /** The rules-spec version this package implements. Bump only alongside the spec. */
 export const SPEC_VERSION = '0.2'
+
+export { simulate, step } from './simulate.js'
+export { tick, hasWon, CONSERVATION } from './tick.js'
+export {
+  createWorld,
+  snapshot,
+  stateKey,
+  seedItems,
+  clearItems,
+  at,
+  costOf,
+  footprintOf,
+  itemsInWorld,
+  conservationHolds,
+  assertConservation,
+  type Building,
+  type Path,
+  type Snapshot,
+  type BuildingSnapshot,
+  type Ledger,
+  type World,
+  type WorldResult,
+} from './world.js'
+export { validateLevel, validateSolution } from './validate.js'
+export { DELTA, opposite, rotate, portsFor, gridOrder } from './geometry.js'
+export {
+  COST,
+  DIRECTIONS,
+  ROTATIONS,
+  MACHINES,
+  PLACEABLE,
+  DEFAULT_DURATION,
+  type AssemblerRecipe,
+  type BuildingType,
+  type Direction,
+  type ItemType,
+  type Level,
+  type MachineType,
+  type Placement,
+  type PlaceableType,
+  type PosTuple,
+  type Rotation,
+  type SimResult,
+  type Solution,
+  type ValidationError,
+} from './types.js'
