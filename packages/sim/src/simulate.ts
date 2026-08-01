@@ -11,14 +11,16 @@ import type { Level, SimResult, Solution } from './types.js'
  * is why it stays pure and free of rendering imports (CLAUDE.md).
  */
 export function simulate(level: Level, solution: Solution): SimResult {
-  const cost = costOf(solution)
-  const footprint = footprintOf(solution)
-
   const built = createWorld(level, solution)
   if (!built.ok) {
-    // §13: nothing is simulated when validation fails.
-    return { won: false, ticks: 0, cost, footprint, jammed: false, errors: built.errors }
+    // §13: nothing is simulated when validation fails, and nothing is scored —
+    // computing cost or footprint from malformed placements would produce
+    // garbage numbers (NaN footprints) next to the error list.
+    return { won: false, ticks: 0, cost: 0, footprint: 0, jammed: false, errors: built.errors }
   }
+
+  const cost = costOf(solution)
+  const footprint = footprintOf(solution)
 
   const world = built.world
   let jammed = false

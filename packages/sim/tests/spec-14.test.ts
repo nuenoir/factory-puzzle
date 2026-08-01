@@ -4,6 +4,11 @@
  * These are the definition of a correct simulator. Per CLAUDE.md, if one of
  * these needs changing to accommodate a code change, stop — that usually means
  * the code is wrong, not the test.
+ *
+ * Where a case could be satisfied by a broken simulator, the fixture observes
+ * the mechanic directly rather than inferring it from item counts: the splitter
+ * and merger cases read the actual push/transfer target every tick, so a
+ * round-robin flag that never flips fails them.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -15,9 +20,11 @@ import {
   seedItems,
   simulate,
   snapshot,
+  stateKey,
   step,
   type PosTuple,
   type Rotation,
+  type World,
 } from '../src/index.js'
 import { beltRun, belt, buildWorld, cellAt, itemsOn, machine, makeLevel, solutionOf } from './helpers.js'
 
@@ -86,73 +93,80 @@ describe('§14.3 back-pressure', () => {
   })
 })
 
-/** Shared fixture for the splitter cases: a rotation-0 splitter at (2,3). */
-function splitterWorld(includeEastBranch: boolean, northLength: number) {
-  const level = makeLevel({ sources: [{ pos: [0, 3], rotation: 0, emits: 'x' }] })
-  const northAll: PosTuple[] = [
-    [2, 2],
-    [2, 1],
-    [2, 0],
-    [3, 0],
-    [4, 0],
-    [5, 0],
-  ]
-  const north = northAll.slice(0, northLength)
+/**
+ * Splitter fixture whose branches each end in their own sink one cell away.
+ * A sink's input buffer holds the item for exactly the tick it arrived, so
+ * reading the two buffers after each step reports which output the splitter
+ * actually pushed to — no inference from branch item counts.
+ */
+function splitterWorld(includeEastBranch: boolean): World {
+  const sinks: Array<{ pos: PosTuple; rotation: Rotation }> = [{ pos: [2, 1], rotation: 270 }]
+  const placements = [belt(1, 3, 'W', 'E'), machine('splitter', 2, 3, 0), belt(2, 2, 'S', 'N')]
 
-  const placements = [
-    belt(1, 3, 'W', 'E'),
-    machine('splitter', 2, 3, 0),
-    // Up the column, then east along the top row.
-    belt(2, 2, 'S', 'N'),
-    belt(2, 1, 'S', 'N'),
-    belt(2, 0, 'S', 'E'),
-    ...beltRun(3, 0, northLength - 3),
-  ]
-  const east: PosTuple[] = [
-    [3, 3],
-    [4, 3],
-    [5, 3],
-    [6, 3],
-  ]
-  if (includeEastBranch) placements.push(...beltRun(3, 3, 4))
+  if (includeEastBranch) {
+    sinks.push({ pos: [4, 3], rotation: 0 })
+    placements.push(belt(3, 3, 'W', 'E'))
+  }
 
-  return { world: buildWorld(level, placements), north, east }
+  const level = makeLevel({
+    sources: [{ pos: [0, 3], rotation: 0, emits: 'x' }],
+    sinks,
+    target: { type: 'nothing', count: 999 },
+  })
+  return buildWorld(level, placements)
+}
+
+/** Which branch received a push on each tick, read off the two sink buffers. */
+function pushSequence(world: World, ticks: number, hasEast: boolean): string[] {
+  const seq: string[] = []
+  for (let i = 0; i < ticks; i += 1) {
+    step(world)
+    const north = cellAt(world, [2, 1]).inputs.get('S') ?? null
+    const east = hasEast ? cellAt(world, [4, 3]).inputs.get('W') ?? null : null
+    // One output buffer means at most one push per tick (§5).
+    expect(north !== null && east !== null).toBe(false)
+    if (north !== null) seq.push('N')
+    if (east !== null) seq.push('E')
+  }
+  return seq
 }
 
 describe('§14.4 splitter alternation', () => {
   it('pushes N, E, N, E, N, E with both branches open', () => {
-    const { world, north, east } = splitterWorld(true, 4)
-    const order: string[] = []
-    let seenNorth = 0
-    let seenEast = 0
+    const world = splitterWorld(true)
+    const seq = pushSequence(world, 20, true)
 
-    for (let i = 0; i < 30 && order.length < 6; i += 1) {
-      step(world)
-      const n = itemsOn(world, north)
-      const e = itemsOn(world, east)
-      if (n > seenNorth) order.push('N')
-      if (e > seenEast) order.push('E')
-      seenNorth = n
-      seenEast = e
-    }
-
-    expect(order).toEqual(['N', 'E', 'N', 'E', 'N', 'E'])
-    expect(seenNorth).toBe(3)
-    expect(seenEast).toBe(3)
+    expect(seq.length).toBeGreaterThanOrEqual(6)
+    expect(seq.slice(0, 6)).toEqual(['N', 'E', 'N', 'E', 'N', 'E'])
   })
 })
 
 describe('§14.5 splitter with one output blocked', () => {
-  it('sends all six items down the open branch and leaves next back at 0', () => {
-    const { world, north } = splitterWorld(false, 6)
+  it('sends every item down the open branch', () => {
+    const world = splitterWorld(false)
+    const seq = pushSequence(world, 20, false)
 
-    for (let i = 0; i < 40; i += 1) step(world)
+    expect(seq.length).toBeGreaterThanOrEqual(6)
+    expect(seq.every((d) => d === 'N')).toBe(true)
+  })
 
-    expect(itemsOn(world, north)).toBe(6)
-    // next flips on every successful push, including fallback successes:
-    // six pushes is six flips, so it lands back on index 0.
-    expect(cellAt(world, [2, 3]).next).toBe(0)
-    expect(conservationHolds(world)).toBe(true)
+  it('keeps flipping next on fallback successes, so it never desyncs', () => {
+    const world = splitterWorld(false)
+    const flags: number[] = []
+
+    for (let i = 0; i < 12; i += 1) {
+      step(world)
+      // Record the flag only on ticks that actually pushed.
+      if ((cellAt(world, [2, 1]).inputs.get('S') ?? null) !== null) {
+        flags.push(cellAt(world, [2, 3]).next)
+      }
+    }
+
+    // §9 flips on ANY success, including the fallback. So the flag alternates
+    // 1, 0, 1, 0 — a splitter that never flips would sit on 0 forever, and one
+    // that only flips on first-choice successes would never leave 1.
+    expect(flags.length).toBeGreaterThanOrEqual(6)
+    expect(flags.slice(0, 6)).toEqual([1, 0, 1, 0, 1, 0])
   })
 })
 
@@ -218,6 +232,27 @@ describe('§14.7 assembler deadlock', () => {
     expect(result.errors).toEqual([])
   })
 
+  it('fills both buffers with the mismatched pair rather than refusing them', () => {
+    // §8's filter is item-level, not pair-aware: "disc" appears in a recipe, so
+    // both ports accept one even though disc+disc assembles nothing. A
+    // pair-aware implementation would leave the second buffer empty.
+    const level = makeLevel({
+      sources: [
+        { pos: [0, 3], rotation: 0, emits: 'disc' },
+        { pos: [1, 2], rotation: 90, emits: 'disc' },
+      ],
+      recipes: { assembler: [{ in: ['disc', 'plate'], out: 'widget' }] },
+    })
+    const world = buildWorld(level, [machine('assembler', 1, 3, 0)])
+
+    for (let i = 0; i < 10; i += 1) step(world)
+
+    const assembler = cellAt(world, [1, 3])
+    expect(assembler.inputs.get('W')).toBe('disc')
+    expect(assembler.inputs.get('N')).toBe('disc')
+    expect(assembler.job).toBeNull()
+  })
+
   it('never pulls in an item that appears in no recipe — it jams on the belt', () => {
     const level = makeLevel({
       sources: [{ pos: [0, 3], rotation: 0, emits: 'rock' }],
@@ -236,27 +271,42 @@ describe('§14.7 assembler deadlock', () => {
 })
 
 describe('§14.8 determinism', () => {
-  it('produces a byte-identical result across 100 runs', () => {
-    const level = makeLevel({
-      sources: [{ pos: [0, 3], rotation: 0, emits: 'circle' }],
-      sinks: [{ pos: [6, 3], rotation: 0 }],
-      recipes: { press: { circle: 'disc' }, assembler: [{ in: ['disc', 'disc'], out: 'widget' }] },
-    })
-    const solution = solutionOf(level, [
-      belt(1, 3, 'W', 'E'),
-      machine('press', 2, 3, 0),
-      machine('splitter', 3, 3, 0),
-      belt(4, 3, 'W', 'E'),
-      belt(3, 2, 'S', 'E'),
-      belt(4, 2, 'W', 'E'),
-      belt(5, 2, 'W', 'S'),
-      machine('assembler', 5, 3, 0),
-    ])
+  const level = makeLevel({
+    sources: [{ pos: [0, 3], rotation: 0, emits: 'circle' }],
+    sinks: [{ pos: [6, 3], rotation: 0 }],
+    recipes: { press: { circle: 'disc' }, assembler: [{ in: ['disc', 'disc'], out: 'widget' }] },
+  })
+  const placements = [
+    belt(1, 3, 'W', 'E'),
+    machine('press', 2, 3, 0),
+    machine('splitter', 3, 3, 0),
+    belt(4, 3, 'W', 'E'),
+    belt(3, 2, 'S', 'E'),
+    belt(4, 2, 'W', 'E'),
+    belt(5, 2, 'W', 'S'),
+    machine('assembler', 5, 3, 0),
+  ]
 
-    const first = JSON.stringify(simulate(level, solution))
+  it('produces a byte-identical result across 100 runs', () => {
+    const first = JSON.stringify(simulate(level, solutionOf(level, placements)))
     for (let i = 0; i < 99; i += 1) {
-      expect(JSON.stringify(simulate(level, solution))).toBe(first)
+      expect(JSON.stringify(simulate(level, solutionOf(level, placements)))).toBe(first)
     }
+  })
+
+  it('produces a byte-identical serialised world state at every tick', () => {
+    // §13 makes the serialised form part of the determinism contract, so the
+    // scalars in SimResult are not enough on their own.
+    const trace = (): string[] => {
+      const world = buildWorld(level, placements)
+      return Array.from({ length: 30 }, () => {
+        step(world)
+        return stateKey(world)
+      })
+    }
+
+    const first = trace()
+    for (let i = 0; i < 9; i += 1) expect(trace()).toEqual(first)
   })
 })
 
@@ -316,16 +366,28 @@ describe('§14.10 loss conservation', () => {
       machine('assembler', 5, 3, 0),
     ])
 
-    // tick() asserts the invariant internally; this checks it independently too.
+    // tick() already throws on a violation; this pins the arithmetic too, so a
+    // ledger that drifted in lockstep with itemsInWorld would still be caught.
     for (let i = 0; i < 60; i += 1) {
       step(world)
+      const { emitted, produced, consumed, delivered, seeded, removed } = world.ledger
+      expect(emitted + seeded + produced).toBe(itemsInWorld(world) + delivered + removed + consumed)
       expect(conservationHolds(world)).toBe(true)
     }
+
+    // And the run genuinely exercised machines, rather than sitting idle.
+    expect(world.ledger.produced).toBeGreaterThan(0)
+    expect(world.ledger.consumed).toBeGreaterThan(0)
+    expect(world.ledger.delivered).toBeGreaterThan(0)
   })
 })
 
-/** Shared fixture for the merger cases: a rotation-0 merger at (2,2). */
-function mergerWorld(feedNorth: boolean) {
+/**
+ * Merger fixture. Reading `output` after each step reports the item the merger
+ * transferred in phase 6 of that tick, which is a direct observation of which
+ * input §9 selected.
+ */
+function mergerWorld(feedNorth: boolean): World {
   const sources: Array<{ pos: PosTuple; rotation: Rotation; emits: string }> = [
     { pos: [0, 2], rotation: 0, emits: 'a' },
   ]
@@ -344,42 +406,64 @@ function mergerWorld(feedNorth: boolean) {
   return buildWorld(level, placements)
 }
 
-/** The order in which items reach the sink, read off per-type delivery counts. */
-function deliveryOrder(world: ReturnType<typeof mergerWorld>, ticks: number): string[] {
-  const order: string[] = []
-  let previous: Record<string, number> = {}
+/**
+ * The merged stream in arrival order. The output belt is a single cell feeding
+ * the sink, so the sink's buffer holds exactly one item per tick — reading it
+ * after each step recovers the stream even when both inputs carry equal types.
+ */
+function mergedStream(world: World, ticks: number): string[] {
+  const stream: string[] = []
   for (let i = 0; i < ticks; i += 1) {
     step(world)
-    const current = snapshot(world).delivered
-    for (const type of Object.keys(current).sort()) {
-      const gain = (current[type] ?? 0) - (previous[type] ?? 0)
-      for (let k = 0; k < gain; k += 1) order.push(type)
-    }
-    previous = current
+    const arrived = cellAt(world, [4, 2]).inputs.get('W') ?? null
+    if (arrived !== null) stream.push(arrived)
   }
-  return order
+  return stream
 }
 
 describe('§14.11 merger alternation', () => {
   it('alternates W, N, W, N with both inputs saturated', () => {
     const world = mergerWorld(true)
-    const order = deliveryOrder(world, 25)
+    const stream = mergedStream(world, 25)
 
-    expect(order.length).toBeGreaterThanOrEqual(6)
+    expect(stream.length).toBeGreaterThanOrEqual(6)
     // next starts at index 0 = W, so the W stream ("a") goes first.
-    expect(order.slice(0, 6)).toEqual(['a', 'b', 'a', 'b', 'a', 'b'])
+    expect(stream.slice(0, 6)).toEqual(['a', 'b', 'a', 'b', 'a', 'b'])
   })
 })
 
 describe('§14.12 merger starvation', () => {
-  it('runs at one item per tick from a single input and keeps flipping next', () => {
+  it('keeps taking from the only fed input', () => {
     const world = mergerWorld(false)
-    const order = deliveryOrder(world, 20)
+    const stream = mergedStream(world, 20)
 
-    expect(order.slice(0, 6)).toEqual(['a', 'a', 'a', 'a', 'a', 'a'])
-    // One transfer per tick sustained: deliveries keep pace with the source.
-    expect(order.length).toBeGreaterThanOrEqual(14)
-    expect(cellAt(world, [2, 2]).next).toBe(order.length % 2 === 0 ? 0 : 1)
+    expect(stream.length).toBeGreaterThanOrEqual(6)
+    expect(stream.slice(0, 6)).toEqual(['a', 'a', 'a', 'a', 'a', 'a'])
     expect(conservationHolds(world)).toBe(true)
+  })
+
+  it('flips next on every transfer, including the fallback to the empty input', () => {
+    const world = mergerWorld(false)
+    for (let i = 0; i < 4; i += 1) step(world) // warm the pipeline
+
+    const flags: number[] = []
+    for (let i = 0; i < 6; i += 1) {
+      step(world)
+      flags.push(cellAt(world, [2, 2]).next)
+    }
+
+    // One transfer per tick in steady state, and §9 flips on every one — so the
+    // flag alternates. A merger that stopped flipping would sit on one value.
+    expect(new Set(flags).size).toBe(2)
+    expect(flags).toEqual(flags[0] === 0 ? [0, 1, 0, 1, 0, 1] : [1, 0, 1, 0, 1, 0])
+  })
+
+  it('sustains one transfer per tick with no stall', () => {
+    const world = mergerWorld(false)
+    for (let i = 0; i < 5; i += 1) step(world)
+    for (let i = 0; i < 10; i += 1) {
+      step(world)
+      expect(cellAt(world, [2, 2]).output).not.toBeNull()
+    }
   })
 })

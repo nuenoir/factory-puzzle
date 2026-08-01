@@ -60,6 +60,17 @@ describe('§13 solution validation', () => {
     expect(codesFor([belt(1, 1, 'W', 'E')], 'some-other-level')).toContain('level_id_mismatch')
   })
 
+  it('rejects a conveyor direction outside N/E/S/W', () => {
+    // Phase 3 hands us raw JSON, so the TypeScript Direction type guards nothing
+    // here. Left unchecked, "X" resolves west and silently simulates.
+    expect(codesFor([{ type: 'conveyor', pos: [1, 1], in: 'X' as never, out: 'Y' as never }])).toContain('invalid_direction')
+  })
+
+  it('rejects a placement with a malformed position rather than throwing', () => {
+    expect(codesFor([{ type: 'conveyor', pos: [1] as never, in: 'W', out: 'E' }])).toContain('malformed_placement')
+    expect(codesFor([{ type: 'conveyor', pos: 'nope' as never, in: 'W', out: 'E' }])).toContain('malformed_placement')
+  })
+
   it('simulates nothing when validation fails', () => {
     const result = simulate(level, { level_id: level.id, placements: [belt(9, 9, 'W', 'E')] })
     expect(result.errors.length).toBeGreaterThan(0)
@@ -81,5 +92,47 @@ describe('§3 level validation', () => {
       }),
     )
     expect(errors.map((e) => e.code)).toEqual(['duplicate_assembler_recipe'])
+  })
+
+  it('does not confuse two distinct pairs whose names contain the separator', () => {
+    // {"a+b", "c"} and {"a", "b+c"} are different pairs; a naive join collides.
+    const errors = validateLevel(
+      makeLevel({
+        recipes: {
+          assembler: [
+            { in: ['a+b', 'c'], out: 'widget' },
+            { in: ['a', 'b+c'], out: 'gadget' },
+          ],
+        },
+      }),
+    )
+    expect(errors).toEqual([])
+  })
+
+  it('rejects a fixture outside the grid', () => {
+    const errors = validateLevel(makeLevel({ sinks: [{ pos: [9, 9], rotation: 0 }] }))
+    expect(errors.map((e) => e.code)).toContain('fixture_out_of_bounds')
+  })
+
+  it('rejects a fixture with a rotation outside 0/90/180/270', () => {
+    const errors = validateLevel(makeLevel({ sources: [{ pos: [0, 3], rotation: 45 as never, emits: 'circle' }] }))
+    expect(errors.map((e) => e.code)).toContain('invalid_fixture_rotation')
+  })
+
+  it('rejects two fixtures sharing a cell', () => {
+    const errors = validateLevel(
+      makeLevel({
+        sources: [{ pos: [2, 2], rotation: 0, emits: 'circle' }],
+        sinks: [{ pos: [2, 2], rotation: 0 }],
+      }),
+    )
+    expect(errors.map((e) => e.code)).toContain('overlapping_fixture')
+  })
+
+  it('surfaces level errors through simulate without simulating', () => {
+    const bad = makeLevel({ sinks: [{ pos: [9, 9], rotation: 0 }] })
+    const result = simulate(bad, solutionOf(bad, [belt(1, 1, 'W', 'E')]))
+    expect(result.errors.map((e) => e.code)).toContain('fixture_out_of_bounds')
+    expect(result.ticks).toBe(0)
   })
 })

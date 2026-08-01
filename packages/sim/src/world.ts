@@ -60,6 +60,10 @@ export interface Ledger {
   consumed: number
   /** Phase-1 sink consumptions, summed across all types. */
   delivered: number
+  /** Items placed by the test API (`seedItems`). Zero in normal play. */
+  seeded: number
+  /** Items removed by the test API (`clearItems`). Zero in normal play. */
+  removed: number
 }
 
 export interface World {
@@ -219,7 +223,7 @@ export function createWorld(level: Level, solution: Solution): WorldResult {
     paths: [],
     delivered: new Map<ItemType, number>(),
     tickCount: 0,
-    ledger: { emitted: 0, produced: 0, consumed: 0, delivered: 0 },
+    ledger: { emitted: 0, produced: 0, consumed: 0, delivered: 0, seeded: 0, removed: 0 },
   }
   ;(world as { paths: readonly Path[] }).paths = computePaths(world, buildings)
   return { ok: true, world }
@@ -295,10 +299,9 @@ export function footprintOf(solution: Solution): number {
  * §13/§14. Put items directly on conveyor cells to build states unreachable
  * from an empty start — §14 cases 2 and 9 need exactly this.
  *
- * Seeded items count as emissions and cleared items as deliveries, so the
- * §14 case 10 ledger stays balanced: an item appearing from nowhere is
- * bookkeeping-equivalent to a source making it, and one removed to a sink
- * taking it.
+ * Seeded and cleared items get their own ledger terms so `emitted` and
+ * `delivered` keep their documented meanings (source emissions, sink
+ * consumptions) even inside tests.
  */
 export function seedItems(world: World, entries: ReadonlyArray<{ pos: PosTuple; item: ItemType }>): void {
   for (const { pos, item } of entries) {
@@ -308,7 +311,7 @@ export function seedItems(world: World, entries: ReadonlyArray<{ pos: PosTuple; 
     }
     if (cell.item !== null) throw new Error(`seedItems: (${pos[0]}, ${pos[1]}) already holds an item.`)
     cell.item = item
-    world.ledger.emitted += 1
+    world.ledger.seeded += 1
   }
 }
 
@@ -321,7 +324,7 @@ export function clearItems(world: World, positions: readonly PosTuple[]): void {
     }
     if (cell.item === null) continue
     cell.item = null
-    world.ledger.delivered += 1
+    world.ledger.removed += 1
   }
 }
 
@@ -388,19 +391,21 @@ export function itemsInWorld(world: World): number {
 
 /**
  * §14 case 10, the gross ledger. Items inside a running job are counted in
- * `consumed` and are deliberately not in `itemsInWorld`.
+ * `consumed` and are deliberately not in `itemsInWorld`. The test API's
+ * `seeded`/`removed` terms are zero in normal play, where this reduces to the
+ * §14 equation exactly.
  */
 export function conservationHolds(world: World): boolean {
-  const { emitted, produced, consumed, delivered } = world.ledger
-  return emitted + produced === itemsInWorld(world) + delivered + consumed
+  const { emitted, produced, consumed, delivered, seeded, removed } = world.ledger
+  return emitted + seeded + produced === itemsInWorld(world) + delivered + removed + consumed
 }
 
 export function assertConservation(world: World): void {
   if (conservationHolds(world)) return
-  const { emitted, produced, consumed, delivered } = world.ledger
+  const { emitted, produced, consumed, delivered, seeded, removed } = world.ledger
   throw new Error(
     `Item conservation violated at tick ${world.tickCount}: ` +
-      `emitted(${emitted}) + produced(${produced}) !== ` +
-      `in_world(${itemsInWorld(world)}) + delivered(${delivered}) + consumed(${consumed})`,
+      `emitted(${emitted}) + seeded(${seeded}) + produced(${produced}) !== ` +
+      `in_world(${itemsInWorld(world)}) + delivered(${delivered}) + removed(${removed}) + consumed(${consumed})`,
   )
 }
