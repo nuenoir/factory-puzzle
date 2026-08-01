@@ -6,9 +6,9 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { simulate, validateLevel } from '../src/index.js'
-import { belt, machine, makeLevel, solutionOf } from './helpers.js'
-import type { Placement } from '../src/types.js'
+import { simulate, validateLevel } from '../src/index'
+import { belt, machine, makeLevel, solutionOf } from './helpers'
+import type { Placement } from '../src/types'
 
 const level = makeLevel({ available: ['conveyor', 'press'] })
 

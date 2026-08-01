@@ -7,9 +7,9 @@
 import { describe, expect, it } from 'vitest'
 
 import levelJson from '../../../levels/001.json'
-import { costOf, simulate, snapshot, step } from '../src/index.js'
-import { belt, buildWorld, machine, solutionOf } from './helpers.js'
-import type { Level, Placement } from '../src/types.js'
+import { costOf, simulate, snapshot, step } from '../src/index'
+import { belt, buildWorld, machine, solutionOf } from './helpers'
+import type { Level, Placement } from '../src/types'
 
 const level = levelJson as unknown as Level
 

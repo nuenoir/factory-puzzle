@@ -1,8 +1,8 @@
 /** The run loop and scoring. docs/rules-spec.md §10, §11, §13. */
 
-import { hasWon, tick } from './tick.js'
-import { costOf, createWorld, footprintOf, stateKey, type World } from './world.js'
-import type { Level, SimResult, Solution } from './types.js'
+import { hasWon, tick } from './tick'
+import { costOf, createWorld, footprintOf, stateKey, type World } from './world'
+import type { Level, SimResult, Solution } from './types'
 
 /**
  * Run a solution to completion.

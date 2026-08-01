@@ -25,8 +25,8 @@ import {
   type PosTuple,
   type Rotation,
   type World,
-} from '../src/index.js'
-import { beltRun, belt, buildWorld, cellAt, itemsOn, machine, makeLevel, solutionOf } from './helpers.js'
+} from '../src/index'
+import { beltRun, belt, buildWorld, cellAt, itemsOn, machine, makeLevel, solutionOf } from './helpers'
 
 describe('§14.1 straight line', () => {
   it('delivers the first item on tick 4', () => {

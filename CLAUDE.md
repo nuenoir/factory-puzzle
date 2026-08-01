@@ -51,16 +51,19 @@ Do not add dependencies without asking. This project should stay boring.
 
 ## Current phase
 
-**Phase 1 — headless simulator.**
+**Phase 2 — playable web MVP.**
 
-In scope right now: `packages/sim/` and its tests. That's all.
+In scope right now: `app/` — grid render, building palette, drag-to-place belts, rotation, delete, run/pause/reset, jam markers, score against par. One hardcoded puzzle (`levels/001.json`), deployed to a URL.
 
 Explicitly **not** in scope yet, do not build these even if they seem quick:
 
-- Any rendering or UI
 - Puzzle generation or the validator (Phase 3)
 - Daily rotation, sharing, streaks (Phase 4)
 - Store assets, analytics, accounts
+
+**Phase 1 is done and locked.** `packages/sim/` passes all twelve §14 cases plus a `spec-invariants` suite, verified falsifiable by mutation testing. Treat it as settled: if the UI wants a behaviour change, that is a spec change first (§15, then tests, then code) — not an edit to the simulator to make a screen look right.
+
+The UI drives the sim through the §13 stepping API — `createWorld`, `step`, `snapshot` — not by calling `simulate` and animating a guess. `snapshot` is the render input.
 
 Level content lives in `levels/`. `levels/001.json` is the hand-designed fixture and the basis for most tests — see `docs/level-001.md` for why it's shaped the way it is.
 
@@ -80,3 +83,5 @@ Kept as a running list. Add to it.
 - Conveyors are `{in, out}` pairs, **not** rotations. Rotation-only belts can't turn corners, which makes every puzzle a straight line.
 - `cost` is the **sum of building costs** from §4, not a count of buildings.
 - Splitter and merger round-robin flags are simulation state. They must reset on run-reset and serialise with saved state. This is the most common source of non-determinism in this genre.
+- A green suite is not a correct suite. Several §14 tests originally passed against a simulator with the round-robin flag disabled, because they asserted on item counts rather than observing the mechanic. When a test can't fail, it isn't testing. Mutation-check anything load-bearing: `scratchpad/mutate.ps1` is the pattern.
+- On Windows, `Get-Content`/`Set-Content` round-trips corrupt every `§` and `—` in source files. Scripts that rewrite files must use `[System.IO.File]::ReadAllText`/`WriteAllText` with UTF-8. Tests do not catch this — comments don't run.

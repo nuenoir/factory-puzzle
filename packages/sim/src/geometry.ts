@@ -1,6 +1,6 @@
 /** Grid and port geometry. docs/rules-spec.md §2 and §4. */
 
-import { DIRECTIONS, type BuildingType, type Direction, type Rotation } from './types.js'
+import { DIRECTIONS, type BuildingType, type Direction, type Rotation } from './types'
 
 /** §2. N = y-1, E = x+1, S = y+1, W = x-1. */
 export const DELTA: Readonly<Record<Direction, { readonly dx: number; readonly dy: number }>> = {

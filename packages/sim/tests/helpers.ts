@@ -1,6 +1,6 @@
 /** Fixture builders for the §14 test cases. */
 
-import { createWorld } from '../src/world.js'
+import { createWorld } from '../src/world'
 import type {
   Direction,
   Level,
@@ -9,8 +9,8 @@ import type {
   PosTuple,
   Rotation,
   Solution,
-} from '../src/types.js'
-import type { Building, World } from '../src/world.js'
+} from '../src/types'
+import type { Building, World } from '../src/world'
 
 export function makeLevel(overrides: Partial<Level> = {}): Level {
   return {

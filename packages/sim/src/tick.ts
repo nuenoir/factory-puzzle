@@ -8,7 +8,7 @@
  * the same commit.
  */
 
-import { gridOrder } from './geometry.js'
+import { gridOrder } from './geometry'
 import {
   assertConservation,
   inNeighbour,
@@ -17,8 +17,8 @@ import {
   type Building,
   type Path,
   type World,
-} from './world.js'
-import { DIRECTIONS, type Direction, type ItemType, type Level } from './types.js'
+} from './world'
+import { DIRECTIONS, type Direction, type ItemType, type Level } from './types'
 
 /**
  * §14 case 10 / CLAUDE.md: the conservation invariant stays asserted

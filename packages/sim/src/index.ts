@@ -14,8 +14,8 @@
 /** The rules-spec version this package implements. Bump only alongside the spec. */
 export const SPEC_VERSION = '0.2'
 
-export { simulate, step } from './simulate.js'
-export { tick, hasWon, CONSERVATION } from './tick.js'
+export { simulate, step } from './simulate'
+export { tick, hasWon, CONSERVATION } from './tick'
 export {
   createWorld,
   snapshot,
@@ -35,9 +35,9 @@ export {
   type Ledger,
   type World,
   type WorldResult,
-} from './world.js'
-export { validateLevel, validateSolution } from './validate.js'
-export { DELTA, opposite, rotate, portsFor, gridOrder } from './geometry.js'
+} from './world'
+export { validateLevel, validateSolution } from './validate'
+export { DELTA, opposite, rotate, portsFor, gridOrder } from './geometry'
 export {
   COST,
   DIRECTIONS,
@@ -58,4 +58,4 @@ export {
   type SimResult,
   type Solution,
   type ValidationError,
-} from './types.js'
+} from './types'

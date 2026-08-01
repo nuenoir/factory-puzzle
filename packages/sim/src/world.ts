@@ -3,8 +3,8 @@
  * docs/rules-spec.md §2, §4, §5, §7.
  */
 
-import { gridOrder, opposite, portsFor } from './geometry.js'
-import { validateLevel, validateSolution } from './validate.js'
+import { gridOrder, opposite, portsFor } from './geometry'
+import { validateLevel, validateSolution } from './validate'
 import {
   COST,
   DEFAULT_DURATION,
@@ -17,7 +17,7 @@ import {
   type PosTuple,
   type Solution,
   type ValidationError,
-} from './types.js'
+} from './types'
 
 export interface Job {
   timer: number

@@ -9,8 +9,8 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { seedItems, simulate, snapshot, step } from '../src/index.js'
-import { belt, buildWorld, cellAt, machine, makeLevel, solutionOf } from './helpers.js'
+import { seedItems, simulate, snapshot, step } from '../src/index'
+import { belt, buildWorld, cellAt, machine, makeLevel, solutionOf } from './helpers'
 
 describe('§4 connection rule', () => {
   it('does not transfer between adjacent belts whose ports do not face each other', () => {

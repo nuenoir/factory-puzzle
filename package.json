@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "app"
   ],
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
-    "web": "node -e \"console.error('No Expo app yet — that is Phase 2 (21 Aug). See docs/roadmap.md.'); process.exit(1)\""
+    "typecheck": "tsc --noEmit && tsc --noEmit -p app",
+    "web": "npm run web --workspace app"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

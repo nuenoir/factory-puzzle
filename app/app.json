@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Factory Puzzle",
+    "slug": "factory-puzzle",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "platforms": ["web", "android"],
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "android": {
+      "package": "com.bagus.factorypuzzle"
+    }
+  }
+}
