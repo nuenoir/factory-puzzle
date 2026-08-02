@@ -13,3 +13,5 @@ export {
   type MachineFloor,
   type ProducerType,
 } from './chemistry'
+
+export { routeBelts, type Grid, type PortRef } from './router'

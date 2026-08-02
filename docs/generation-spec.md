@@ -145,14 +145,16 @@ The simulator contributes no randomness (CLAUDE.md), so this reduces to: the gen
 
 ## 8. Decisions to confirm before building
 
+**Confirmed 2 Aug 2026 — all defaults accepted.** Any of these can still be changed; unlike the rules spec they do not invalidate hand-derived numbers, they only change which candidates pass. Re-run the batch after changing one, and say so in the write-up.
+
 | # | Decision | Default | Override? |
 |---|---|---|---|
-| 1 | Grid sizes generated | 5×5 to 7×7 | |
-| 2 | `min_cost` (non-trivial floor) | 8 | |
-| 3 | `max_cost` (budget ceiling) | 30 | |
-| 4 | `par` | Computed, not proposed | |
-| 5 | Materially different | Machine multiset + flow graph (§5) | |
-| 6 | Stage C bound | Plan/placement caps + timeout, all logged | |
-| 7 | Proven vs bounded rejection | Separate codes, never merged (§4) | |
-| 8 | Log format | JSONL, appended live | |
-| 9 | `max_ticks` | 300, fixed | |
+| 1 | Grid sizes generated | 5×5 to 7×7 | Accepted |
+| 2 | `min_cost` (non-trivial floor) | 8 | Accepted |
+| 3 | `max_cost` (budget ceiling) | 30 | Accepted |
+| 4 | `par` | Computed, not proposed | Accepted |
+| 5 | Materially different | Machine multiset + flow graph (§5) | Accepted |
+| 6 | Stage C bound | Plan/placement caps + timeout, all logged | Accepted |
+| 7 | Proven vs bounded rejection | Separate codes, never merged (§4) | Accepted |
+| 8 | Log format | JSONL, appended live | Accepted |
+| 9 | `max_ticks` | 300, fixed | Accepted |

@@ -38,6 +38,7 @@ export {
 } from './world'
 export { validateLevel, validateSolution } from './validate'
 export { neighbourOf, opposite, rotate, portsFor, gridOrder } from './geometry'
+export { beltsFromPath, directionBetween, type PathEnds } from './paths'
 export {
   COST,
   DIRECTIONS,
