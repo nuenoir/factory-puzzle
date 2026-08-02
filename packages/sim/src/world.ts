@@ -332,6 +332,11 @@ export interface BuildingSnapshot {
   readonly type: BuildingType
   readonly x: number
   readonly y: number
+  /** Static geometry, repeated here so a snapshot alone is enough to render. */
+  readonly inPorts: readonly Direction[]
+  readonly outPorts: readonly Direction[]
+  /** Source only. */
+  readonly emits: ItemType | null
   readonly item: ItemType | null
   readonly inputs: Readonly<Record<string, ItemType | null>>
   readonly output: ItemType | null
@@ -362,6 +367,9 @@ export function snapshot(world: World): Snapshot {
         type: b.type,
         x: b.x,
         y: b.y,
+        inPorts: b.inPorts,
+        outPorts: b.outPorts,
+        emits: b.emits,
         item: b.item,
         inputs,
         output: b.output,
