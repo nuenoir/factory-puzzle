@@ -26,3 +26,5 @@ export {
   type PlanNodeKind,
   type PlanLimits,
 } from './planner'
+
+export { solve, DEFAULT_SEARCH_LIMITS, type SearchLimits, type SolveOutcome } from './solver'

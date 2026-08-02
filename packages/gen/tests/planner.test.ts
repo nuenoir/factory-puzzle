@@ -59,25 +59,43 @@ describe('enumeratePlans', () => {
         .join('+'),
     )
     expect(kinds).toContain('assembler+press+splitter')
-    expect(kinds).toContain('assembler+press+press')
+    // Split-then-press needs its own splitter: one source cannot feed two
+    // presses unaided, which is the whole reason that route costs more.
+    expect(kinds).toContain('assembler+press+press+splitter')
   })
 
-  it('orders them cheapest first, and split-then-press really is dearer', () => {
+  it('prices the two routes exactly as docs/level-001.md does', () => {
     const plans = enumeratePlans(level001)
-    // press(5) + splitter(3) + assembler(8) = 16, versus press+press+assembler = 18.
+    // Press then split: press(5) + splitter(3) = 8, plus assembler(8) = 16.
+    // Split then press: splitter(3) + press(5) + press(5) = 13, plus 8 = 21.
     expect(plans[0].machineCost).toBe(16)
-    expect(plans[1].machineCost).toBe(18)
+    expect(plans[1].machineCost).toBe(21)
     expect(plans[0].machineCost).toBeLessThan(plans[1].machineCost)
   })
 
-  it('drops the shared-splitter plan when the level offers no splitter', () => {
+  it('finds nothing at all when a lone source has no splitter to fan out with', () => {
+    // A source has one output port. Without a splitter, no arrangement can put
+    // two discs into an assembler, so the level is genuinely unsolvable.
     const noSplitter = makeLevel({
       available: ['conveyor', 'press', 'assembler'],
       recipes: level001.recipes,
     })
-    const plans = enumeratePlans(noSplitter)
-    expect(plans).toHaveLength(1)
-    expect(plans[0].machineCost).toBe(18)
+    expect(enumeratePlans(noSplitter)).toEqual([])
+  })
+
+  it('skips the extra splitter when a second source already supplies the fan-out', () => {
+    const twoSources = makeLevel({
+      sources: [
+        { pos: [0, 2], rotation: 0, emits: 'circle' },
+        { pos: [0, 4], rotation: 0, emits: 'circle' },
+      ],
+      available: ['conveyor', 'press', 'assembler'],
+      recipes: level001.recipes,
+    })
+    const plans = enumeratePlans(twoSources)
+    // One press per source, straight into the assembler: 5 + 5 + 8.
+    expect(plans.some((p) => p.machineCost === 18)).toBe(true)
+    expect(plans.every((p) => p.nodes.every((n) => n.kind !== 'splitter'))).toBe(true)
   })
 
   it('feeds both assembler ports from the one splitter node', () => {

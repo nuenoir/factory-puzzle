@@ -159,6 +159,94 @@ function fragmentsFor(
   return out
 }
 
+/** How many consumer ports a node can feed directly. Only splitters fan out. */
+function outCapacity(kind: PlanNodeKind): number {
+  return kind === 'splitter' ? 2 : 1
+}
+
+/**
+ * Make a plan physically buildable, or reject it.
+ *
+ * Two things go wrong in raw enumeration. Independent chains drawing on the
+ * same source produce two *copies* of that source, but a level has one, at one
+ * cell. And once merged, a node may feed more consumers than it has output
+ * ports — a source cannot supply two presses on its own.
+ *
+ * Both are fixed by splitters, which is precisely why level 001's second
+ * solution costs what it does: split-then-press has to buy the splitter too.
+ * Without this step the planner quietly prices that plan at 18 and emits a
+ * layout no grid could ever realise.
+ */
+function normalise(plan: Plan, level: Level): Plan | null {
+  // Collapse duplicate sources onto the one the level actually has.
+  const canonicalSource = new Map<number, number>()
+  const remap = new Map<number, number>()
+  for (const node of plan.nodes) {
+    if (node.kind !== 'source') {
+      remap.set(node.id, node.id)
+      continue
+    }
+    const index = node.sourceIndex ?? 0
+    const existing = canonicalSource.get(index)
+    if (existing === undefined) {
+      canonicalSource.set(index, node.id)
+      remap.set(node.id, node.id)
+    } else {
+      remap.set(node.id, existing)
+    }
+  }
+
+  let nodes: PlanNode[] = plan.nodes
+    .filter((n) => remap.get(n.id) === n.id)
+    .map((n) => ({ ...n, inputs: n.inputs.map((i) => remap.get(i) as number) }))
+
+  // Insert splitters wherever a node now feeds more ports than it has.
+  let nextId = Math.max(...nodes.map((n) => n.id)) + 1
+  for (const producer of [...nodes]) {
+    const consumers: { nodeId: number; port: number }[] = []
+    for (const node of nodes) {
+      node.inputs.forEach((inputId, port) => {
+        if (inputId === producer.id) consumers.push({ nodeId: node.id, port })
+      })
+    }
+    const capacity = outCapacity(producer.kind)
+    if (consumers.length <= capacity) continue
+    if (!level.available.includes('splitter')) return null
+
+    // A chain of splitters: each adds one more outlet.
+    const needed = consumers.length - 1
+    const splitters: PlanNode[] = []
+    for (let i = 0; i < needed; i += 1) {
+      splitters.push({
+        id: nextId + i,
+        kind: 'splitter',
+        item: producer.item,
+        inputs: [i === 0 ? producer.id : nextId + i - 1],
+      })
+    }
+    nextId += needed
+
+    // Each splitter hands one consumer its first outlet; the last takes two.
+    const rewires = new Map<string, number>()
+    consumers.forEach((consumer, i) => {
+      const feeder = i < needed ? splitters[i] : splitters[needed - 1]
+      rewires.set(`${consumer.nodeId}:${consumer.port}`, feeder.id)
+    })
+
+    nodes = [
+      ...nodes.map((node) => ({
+        ...node,
+        inputs: node.inputs.map((inputId, port) =>
+          inputId === producer.id ? rewires.get(`${node.id}:${port}`) ?? inputId : inputId,
+        ),
+      })),
+      ...splitters,
+    ]
+  }
+
+  return { nodes, machineCost: machineCostOf(nodes) }
+}
+
 export function machineCostOf(nodes: readonly PlanNode[]): number {
   return nodes
     .filter((n) => MACHINE_KINDS.has(n.kind))
@@ -173,14 +261,16 @@ export function machineCostOf(nodes: readonly PlanNode[]): number {
  * still yields the best answer available rather than an arbitrary one.
  */
 export function enumeratePlans(level: Level, limits: PlanLimits = DEFAULT_PLAN_LIMITS): Plan[] {
-  const plans = fragmentsFor(level, level.target.type, 0, new Set(), limits).map((fragment) => {
-    const sinkId = fragment.nodes.length
-    const nodes: PlanNode[] = [
-      ...fragment.nodes,
-      { id: sinkId, kind: 'sink', item: level.target.type, inputs: [fragment.rootId] },
-    ]
-    return { nodes, machineCost: machineCostOf(nodes) }
-  })
+  const plans = fragmentsFor(level, level.target.type, 0, new Set(), limits)
+    .map((fragment) => {
+      const sinkId = fragment.nodes.length
+      const nodes: PlanNode[] = [
+        ...fragment.nodes,
+        { id: sinkId, kind: 'sink', item: level.target.type, inputs: [fragment.rootId] },
+      ]
+      return normalise({ nodes, machineCost: machineCostOf(nodes) }, level)
+    })
+    .filter((plan): plan is Plan => plan !== null)
 
   const seen = new Set<string>()
   return plans
