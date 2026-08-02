@@ -1,56 +1,81 @@
 /**
- * Phase 2 — the board.
+ * Phase 2 — the playable board.
  *
  * The UI drives the simulator through the §13 stepping API (`createWorld`,
  * `step`, `snapshot`), never by calling `simulate` and animating a guess. That
- * matters: the factory you watch on screen is the same run that gets scored,
- * so an animation can never disagree with the result.
+ * matters: the factory you watch is the same run that gets scored, so an
+ * animation can never disagree with the result.
+ *
+ * Editing rebuilds the world from scratch, which is also what resets the §9
+ * round-robin flags — CLAUDE.md calls those the classic source of
+ * non-determinism in this genre.
  *
  * The dependency runs one way only: app imports sim, never the reverse.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { costOf, createWorld, snapshot, stateKey, step, type Snapshot, type World } from '@factory/sim'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import {
+  costOf,
+  createWorld,
+  snapshot,
+  stateKey,
+  step,
+  type PosTuple,
+  type Rotation,
+  type Snapshot,
+  type World,
+} from '@factory/sim'
 
-import { Grid } from './components/Grid'
-import { level, solution } from './puzzle'
+import { Grid, type PointerPhase } from './components/Grid'
+import { Palette, type Tool } from './components/Palette'
+import { beltsFromPath, directionBetween, editReducer, placementAt } from './editor'
+import { level } from './puzzle'
 import { colors } from './theme'
 
 type Status = 'idle' | 'running' | 'won' | 'jammed' | 'timeout'
 
 const TICK_MS = 300
-const cost = costOf(solution)
 
-/**
- * Build a fresh world, which also resets the §9 round-robin flags.
- * Returns the validation errors rather than throwing — a blank screen tells
- * you nothing, and §13's whole point is that bad input is reportable.
- */
-function freshWorld(): { world: World; errors: readonly string[] } {
-  const built = createWorld(level, solution)
-  if (!built.ok) return { world: null as unknown as World, errors: built.errors.map((e) => e.message) }
-  return { world: built.world, errors: [] }
-}
+/** Sources and sinks are fixed by the level and not placeable (§4). */
+const fixtureCells = new Set(
+  [...level.sources, ...level.sinks].map((f) => `${f.pos[0]},${f.pos[1]}`),
+)
 
 export default function App() {
-  const worldRef = useRef<World>(undefined as unknown as World)
+  const [placements, dispatch] = useReducer(editReducer, [])
+  const [tool, setTool] = useState<Tool>('conveyor')
+  const [rotation, setRotation] = useState<Rotation>(0)
+
   const [snap, setSnap] = useState<Snapshot | null>(null)
   const [status, setStatus] = useState<Status>('idle')
   const [playing, setPlaying] = useState(false)
   const [errors, setErrors] = useState<readonly string[]>([])
 
-  const reset = useCallback(() => {
-    const built = freshWorld()
-    setErrors(built.errors)
-    if (built.errors.length > 0) return
+  const worldRef = useRef<World | null>(null)
+  const drag = useRef<{ path: PosTuple[]; anchor: PosTuple | null; terminus: PosTuple | null } | null>(null)
+
+  const solution = useMemo(() => ({ level_id: level.id, placements }), [placements])
+  const cost = useMemo(() => costOf(solution), [solution])
+
+  /** Rebuild from the current placements. Any edit lands here, so any edit
+   *  also rewinds the run to tick 0. */
+  const rebuild = useCallback(() => {
+    setPlaying(false)
+    setStatus('idle')
+    const built = createWorld(level, solution)
+    if (!built.ok) {
+      setErrors(built.errors.map((e) => e.message))
+      setSnap(null)
+      worldRef.current = null
+      return
+    }
+    setErrors([])
     worldRef.current = built.world
     setSnap(snapshot(built.world))
-    setStatus('idle')
-    setPlaying(false)
-  }, [])
+  }, [solution])
 
-  useEffect(reset, [reset])
+  useEffect(rebuild, [rebuild])
 
   const advance = useCallback(() => {
     const world = worldRef.current
@@ -58,11 +83,10 @@ export default function App() {
 
     const before = stateKey(world)
     step(world)
-    const next = snapshot(world)
-    setSnap(next)
+    setSnap(snapshot(world))
 
     // §10: win is checked first, then the tick limit.
-    if ((next.delivered[level.target.type] ?? 0) >= level.target.count) {
+    if ((world.delivered.get(level.target.type) ?? 0) >= level.target.count) {
       setStatus('won')
       setPlaying(false)
     } else if (world.tickCount >= level.max_ticks) {
@@ -83,49 +107,132 @@ export default function App() {
     return () => clearInterval(id)
   }, [playing, advance])
 
-  if (errors.length > 0) {
-    return (
-      <View style={styles.screen}>
-        <Text style={styles.title}>This puzzle does not validate</Text>
-        {errors.map((message) => (
-          <Text key={message} style={[styles.status, { color: colors.bad, textAlign: 'center' }]}>
-            {message}
-          </Text>
-        ))}
-      </View>
-    )
-  }
+  const handleCell = useCallback(
+    (phase: PointerPhase, x: number, y: number) => {
+      if (phase === 'up') {
+        drag.current = null
+        return
+      }
+      const pos: PosTuple = [x, y]
+      if (fixtureCells.has(`${x},${y}`)) return
 
-  if (!snap) return <View style={styles.screen} />
+      if (tool === 'delete') {
+        dispatch({ kind: 'remove', pos })
+        return
+      }
 
-  const delivered = snap.delivered[level.target.type] ?? 0
+      if (tool === 'conveyor') {
+        // A cell holding a machine or fixture cannot become a belt, but it can
+        // bookend one: drag out of a splitter and the first belt faces back at
+        // it; drag into an assembler and the last belt points at it.
+        const occupant = placementAt(placements, pos)
+        const isBuilding = fixtureCells.has(`${x},${y}`) || (occupant !== undefined && occupant.type !== 'conveyor')
+
+        if (phase === 'down') {
+          drag.current = isBuilding
+            ? { path: [], anchor: pos, terminus: null }
+            : { path: [pos], anchor: null, terminus: null }
+          if (!isBuilding) dispatch({ kind: 'placeMany', placements: beltsFromPath([pos]) })
+          return
+        }
+
+        const state = drag.current
+        if (!state || state.terminus) return
+        const ends = { anchor: state.anchor, terminus: null }
+
+        const last = state.path.length > 0 ? state.path[state.path.length - 1] : state.anchor
+        if (!last || (last[0] === x && last[1] === y)) return
+
+        if (isBuilding) {
+          if (state.path.length === 0) return
+          if (!directionBetween(last, pos)) return
+          state.terminus = pos
+          dispatch({ kind: 'placeMany', placements: beltsFromPath(state.path, { ...ends, terminus: pos }) })
+          return
+        }
+
+        // Dragging back onto the previous cell undoes the last step.
+        const previous = state.path.length >= 2 ? state.path[state.path.length - 2] : null
+        if (previous && previous[0] === x && previous[1] === y) {
+          state.path.pop()
+          dispatch({ kind: 'placeMany', placements: beltsFromPath(state.path, ends) })
+          return
+        }
+
+        // Ignore jumps (a fast drag) and self-crossings — a conveyor has one
+        // in and one out, so a path may not visit a cell twice.
+        if (!directionBetween(last, pos)) return
+        if (state.path.some((p) => p[0] === x && p[1] === y)) return
+
+        state.path.push(pos)
+        dispatch({ kind: 'placeMany', placements: beltsFromPath(state.path, ends) })
+        return
+      }
+
+      // Machines: tap an empty cell to place, tap your own building to turn it.
+      if (phase !== 'down') return
+      const existing = placementAt(placements, pos)
+      if (existing && existing.type === tool) dispatch({ kind: 'rotate', pos })
+      else dispatch({ kind: 'place', placement: { type: tool, pos, rotation } })
+    },
+    [tool, rotation, placements],
+  )
+
+  const delivered = snap ? snap.delivered[level.target.type] ?? 0 : 0
   const overPar = cost - level.par
   const finished = status === 'won' || status === 'jammed' || status === 'timeout'
+  const runnable = snap !== null && errors.length === 0
 
   return (
-    <View style={styles.screen}>
+    <ScrollView contentContainerStyle={styles.screen}>
       <View style={styles.header}>
         <Text style={styles.title}>Factory Puzzle</Text>
-        <Text style={styles.subtitle}>Level {level.id}</Text>
+        <Text style={styles.subtitle}>
+          Level {level.id} — deliver {level.target.count} {level.target.type}
+        </Text>
       </View>
 
-      <Grid snapshot={snap} width={level.grid.width} height={level.grid.height} />
+      {snap ? (
+        <Grid snapshot={snap} width={level.grid.width} height={level.grid.height} onCell={handleCell} />
+      ) : (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorTitle}>This layout is not valid</Text>
+          {errors.map((message) => (
+            <Text key={message} style={styles.errorLine}>
+              {message}
+            </Text>
+          ))}
+        </View>
+      )}
+
+      <Palette
+        available={level.available}
+        tool={tool}
+        rotation={rotation}
+        onTool={setTool}
+        onRotate={() => setRotation(((rotation + 60) % 360) as Rotation)}
+      />
 
       <View style={styles.hud}>
-        <Stat label="Tick" value={`${snap.tick} / ${level.max_ticks}`} />
+        <Stat label="Tick" value={snap ? `${snap.tick}` : '—'} />
         <Stat label={level.target.type} value={`${delivered} / ${level.target.count}`} />
         <Stat label="Cost" value={`${cost}`} />
-        <Stat label="Par" value={overPar === 0 ? 'E' : overPar > 0 ? `+${overPar}` : `${overPar}`} tone={overPar <= 0 ? 'good' : 'bad'} />
+        <Stat
+          label={`Par ${level.par}`}
+          value={overPar === 0 ? 'E' : overPar > 0 ? `+${overPar}` : `${overPar}`}
+          tone={overPar <= 0 ? 'good' : 'bad'}
+        />
       </View>
 
       <View style={styles.controls}>
-        <Button label={playing ? 'Pause' : 'Run'} onPress={() => setPlaying((p) => !p)} disabled={finished} primary />
-        <Button label="Step" onPress={advance} disabled={playing || finished} />
-        <Button label="Reset" onPress={reset} />
+        <Button label={playing ? 'Pause' : 'Run'} onPress={() => setPlaying((p) => !p)} disabled={!runnable || finished} primary />
+        <Button label="Step" onPress={advance} disabled={!runnable || playing || finished} />
+        <Button label="Reset" onPress={rebuild} disabled={!runnable} />
+        <Button label="Clear" onPress={() => dispatch({ kind: 'clear' })} disabled={placements.length === 0} />
       </View>
 
-      <Text style={[styles.status, statusTone(status)]}>{statusText(status, snap.tick)}</Text>
-    </View>
+      <Text style={[styles.status, statusTone(status)]}>{statusText(status, snap?.tick ?? 0, placements.length)}</Text>
+    </ScrollView>
   )
 }
 
@@ -153,6 +260,7 @@ function Button({
 }) {
   return (
     <Pressable
+      testID={`btn-${label.toLowerCase()}`}
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
@@ -169,11 +277,12 @@ function Button({
   )
 }
 
-function statusText(status: Status, tick: number): string {
+function statusText(status: Status, tick: number, placed: number): string {
   if (status === 'won') return `Solved on tick ${tick}.`
-  if (status === 'jammed') return 'Jammed — nothing can move. Reset to try again.'
+  if (status === 'jammed') return 'Jammed — nothing can move. Edit the line and run again.'
   if (status === 'timeout') return 'Out of ticks.'
   if (status === 'running') return 'Running.'
+  if (placed === 0) return 'Pick a building and drag on the board to start.'
   return 'Press Run to start the factory.'
 }
 
@@ -184,31 +293,34 @@ function statusTone(status: Status) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.screen, padding: 24 },
-  header: { alignItems: 'center', marginBottom: 16 },
+  screen: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.screen, padding: 20, minHeight: '100%' },
+  header: { alignItems: 'center', marginBottom: 14 },
   title: { color: colors.text, fontSize: 24, fontWeight: '700' },
   subtitle: { color: colors.muted, fontSize: 13, marginTop: 2 },
-  hud: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  errorBox: { backgroundColor: colors.panel, borderRadius: 10, padding: 16, maxWidth: 460 },
+  errorTitle: { color: colors.bad, fontSize: 15, fontWeight: '700', marginBottom: 6 },
+  errorLine: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  hud: { flexDirection: 'row', gap: 8, marginTop: 14, flexWrap: 'wrap', justifyContent: 'center' },
   stat: {
     backgroundColor: colors.panel,
     borderColor: colors.panelEdge,
     borderWidth: 1,
     borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
     alignItems: 'center',
-    minWidth: 84,
+    minWidth: 78,
   },
-  statLabel: { color: colors.muted, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 },
-  statValue: { color: colors.text, fontSize: 16, fontWeight: '700', marginTop: 2 },
-  controls: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  statLabel: { color: colors.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 },
+  statValue: { color: colors.text, fontSize: 15, fontWeight: '700', marginTop: 2 },
+  controls: { flexDirection: 'row', gap: 8, marginTop: 14, flexWrap: 'wrap', justifyContent: 'center' },
   button: {
     borderWidth: 1,
     borderColor: colors.panelEdge,
     backgroundColor: colors.panel,
     borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 22,
+    paddingVertical: 9,
+    paddingHorizontal: 18,
   },
   buttonPrimary: { backgroundColor: '#2b3550', borderColor: '#3d4a6e' },
   buttonPressed: { opacity: 0.7 },
@@ -216,5 +328,5 @@ const styles = StyleSheet.create({
   buttonLabel: { color: colors.text, fontSize: 14, fontWeight: '600' },
   buttonLabelPrimary: { color: '#cfe0ff' },
   buttonLabelDisabled: { color: colors.faint },
-  status: { marginTop: 14, fontSize: 13 },
+  status: { marginTop: 12, fontSize: 13, textAlign: 'center' },
 })

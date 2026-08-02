@@ -38,6 +38,43 @@ export function cellOrigin(x: number, y: number, w: number) {
   return { left: x * w + (y % 2 === 1 ? w / 2 : 0), top: y * rowStep(w) }
 }
 
+/** Centre of a cell, in board pixels. */
+export function cellCentre(x: number, y: number, w: number) {
+  const { left, top } = cellOrigin(x, y, w)
+  return { cx: left + w / 2, cy: top + hexHeight(w) / 2 }
+}
+
+/**
+ * Which cell contains a board pixel.
+ *
+ * Cell bounding boxes overlap — rows sit only three quarters apart and odd
+ * rows are offset — so a point inside one box is often inside another hexagon.
+ * Nearest centre is the exact answer, not an approximation: a hexagonal grid
+ * is precisely the Voronoi diagram of its centres. Only the nine cells around
+ * the estimate can win, so this stays cheap.
+ */
+export function hexAt(px: number, py: number, w: number, columns: number, rows: number) {
+  const estimateRow = Math.round((py - hexHeight(w) / 2) / rowStep(w))
+  let best: { x: number; y: number } | null = null
+  let bestDistance = Infinity
+
+  for (let y = estimateRow - 1; y <= estimateRow + 1; y += 1) {
+    if (y < 0 || y >= rows) continue
+    const offset = y % 2 === 1 ? w / 2 : 0
+    const estimateCol = Math.round((px - offset - w / 2) / w)
+    for (let x = estimateCol - 1; x <= estimateCol + 1; x += 1) {
+      if (x < 0 || x >= columns) continue
+      const { cx, cy } = cellCentre(x, y, w)
+      const distance = (px - cx) ** 2 + (py - cy) ** 2
+      if (distance < bestDistance) {
+        bestDistance = distance
+        best = { x, y }
+      }
+    }
+  }
+  return best
+}
+
 export const colors = {
   screen: '#12141a',
   panel: '#1b1e27',

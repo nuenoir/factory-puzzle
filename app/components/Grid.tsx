@@ -11,7 +11,9 @@
  * cell or buffer, so what you see is exactly what the engine scored.
  */
 
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import { useMemo, useRef } from 'react'
+import { PanResponder, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import type { GestureResponderEvent } from 'react-native'
 import type { BuildingSnapshot, Direction, ItemType, Snapshot } from '@factory/sim'
 
 import {
@@ -22,20 +24,65 @@ import {
   cellOrigin,
   cellSizeFor,
   colors,
+  hexAt,
   hexHeight,
   itemColor,
 } from '../theme'
+
+export type PointerPhase = 'down' | 'move' | 'up'
 
 interface GridProps {
   readonly snapshot: Snapshot
   readonly width: number
   readonly height: number
+  /** Called with the cell under the pointer. `up` carries the last cell again. */
+  readonly onCell?: (phase: PointerPhase, x: number, y: number) => void
 }
 
-export function Grid({ snapshot, width, height }: GridProps) {
+export function Grid({ snapshot, width, height, onCell }: GridProps) {
   const { width: windowWidth } = useWindowDimensions()
   const w = cellSizeFor(Math.min(windowWidth - 24, 520), width)
   const board = boardSize(w, width, height)
+
+  // PanResponder is recreated when geometry changes; the callback is read
+  // through a ref so a new handler identity does not rebuild the responder
+  // mid-drag and drop the gesture.
+  const onCellRef = useRef(onCell)
+  onCellRef.current = onCell
+  const lastCell = useRef<{ x: number; y: number } | null>(null)
+
+  const responder = useMemo(() => {
+    const locate = (event: GestureResponderEvent) => {
+      const { locationX, locationY } = event.nativeEvent
+      return hexAt(locationX - GAP, locationY - GAP, w, width, height)
+    }
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (event) => {
+        const cell = locate(event)
+        if (!cell) return
+        lastCell.current = cell
+        onCellRef.current?.('down', cell.x, cell.y)
+      },
+      onPanResponderMove: (event) => {
+        const cell = locate(event)
+        if (!cell) return
+        const previous = lastCell.current
+        if (previous && previous.x === cell.x && previous.y === cell.y) return
+        lastCell.current = cell
+        onCellRef.current?.('move', cell.x, cell.y)
+      },
+      onPanResponderRelease: () => {
+        const cell = lastCell.current
+        onCellRef.current?.('up', cell?.x ?? -1, cell?.y ?? -1)
+      },
+      onPanResponderTerminate: () => {
+        const cell = lastCell.current
+        onCellRef.current?.('up', cell?.x ?? -1, cell?.y ?? -1)
+      },
+    })
+  }, [w, width, height])
 
   const byCell = new Map<string, BuildingSnapshot>()
   for (const b of snapshot.buildings) byCell.set(`${b.x},${b.y}`, b)
@@ -48,7 +95,11 @@ export function Grid({ snapshot, width, height }: GridProps) {
   }
 
   return (
-    <View testID="board" style={[styles.board, { width: board.width + GAP * 2, height: board.height + GAP * 2 }]}>
+    <View
+      testID="board"
+      style={[styles.board, { width: board.width + GAP * 2, height: board.height + GAP * 2 }]}
+      {...(onCell ? responder.panHandlers : {})}
+    >
       {cells}
     </View>
   )
