@@ -22,13 +22,15 @@ type Status = 'idle' | 'running' | 'won' | 'jammed' | 'timeout'
 const TICK_MS = 300
 const cost = costOf(solution)
 
-/** Build a fresh world, which also resets the §9 round-robin flags. */
-function freshWorld(): World {
+/**
+ * Build a fresh world, which also resets the §9 round-robin flags.
+ * Returns the validation errors rather than throwing — a blank screen tells
+ * you nothing, and §13's whole point is that bad input is reportable.
+ */
+function freshWorld(): { world: World; errors: readonly string[] } {
   const built = createWorld(level, solution)
-  if (!built.ok) {
-    throw new Error(`Level 001 does not validate:\n${built.errors.map((e) => e.message).join('\n')}`)
-  }
-  return built.world
+  if (!built.ok) return { world: null as unknown as World, errors: built.errors.map((e) => e.message) }
+  return { world: built.world, errors: [] }
 }
 
 export default function App() {
@@ -36,11 +38,14 @@ export default function App() {
   const [snap, setSnap] = useState<Snapshot | null>(null)
   const [status, setStatus] = useState<Status>('idle')
   const [playing, setPlaying] = useState(false)
+  const [errors, setErrors] = useState<readonly string[]>([])
 
   const reset = useCallback(() => {
-    const world = freshWorld()
-    worldRef.current = world
-    setSnap(snapshot(world))
+    const built = freshWorld()
+    setErrors(built.errors)
+    if (built.errors.length > 0) return
+    worldRef.current = built.world
+    setSnap(snapshot(built.world))
     setStatus('idle')
     setPlaying(false)
   }, [])
@@ -77,6 +82,19 @@ export default function App() {
     const id = setInterval(advance, TICK_MS)
     return () => clearInterval(id)
   }, [playing, advance])
+
+  if (errors.length > 0) {
+    return (
+      <View style={styles.screen}>
+        <Text style={styles.title}>This puzzle does not validate</Text>
+        {errors.map((message) => (
+          <Text key={message} style={[styles.status, { color: colors.bad, textAlign: 'center' }]}>
+            {message}
+          </Text>
+        ))}
+      </View>
+    )
+  }
 
   if (!snap) return <View style={styles.screen} />
 

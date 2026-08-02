@@ -3,7 +3,7 @@
  * docs/rules-spec.md §2, §4, §5, §7.
  */
 
-import { gridOrder, opposite, portsFor } from './geometry'
+import { gridOrder, neighbourOf, opposite, portsFor } from './geometry'
 import { validateLevel, validateSolution } from './validate'
 import {
   COST,
@@ -93,8 +93,8 @@ export function at(world: World, x: number, y: number): Building | null {
 }
 
 function neighbour(world: World, b: Building, dir: Direction): Building | null {
-  const d = dir === 'N' ? { dx: 0, dy: -1 } : dir === 'E' ? { dx: 1, dy: 0 } : dir === 'S' ? { dx: 0, dy: 1 } : { dx: -1, dy: 0 }
-  return at(world, b.x + d.dx, b.y + d.dy)
+  const { x, y } = neighbourOf(b.x, b.y, dir)
+  return at(world, x, y)
 }
 
 /**

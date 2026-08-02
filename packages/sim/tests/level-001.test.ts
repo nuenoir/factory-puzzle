@@ -18,10 +18,12 @@ const reference: Placement[] = [
   belt(1, 3, 'W', 'E'),
   machine('press', 2, 3, 0),
   machine('splitter', 3, 3, 0),
-  belt(4, 3, 'W', 'E'),
-  belt(3, 2, 'S', 'E'),
-  belt(4, 2, 'W', 'E'),
-  belt(5, 2, 'W', 'S'),
+  // The NE fork: up and over into the assembler's NW port.
+  belt(4, 2, 'SW', 'E'),
+  belt(5, 2, 'W', 'SE'),
+  // The SE fork: down and back up into the assembler's W port.
+  belt(4, 4, 'NW', 'NE'),
+  belt(4, 3, 'SW', 'E'),
   machine('assembler', 5, 3, 0),
 ]
 
@@ -52,7 +54,8 @@ describe('level 001', () => {
   })
 
   it('reports the bounding box of the placements as footprint', () => {
-    // x spans 1..5, y spans 2..3 => 5 wide, 2 tall.
-    expect(simulate(level, solutionOf(level, reference)).footprint).toBe(10)
+    // x spans 1..5, y spans 2..4 => 5 wide, 3 tall. The hex fork is symmetric,
+    // so it uses a row above and a row below the main line.
+    expect(simulate(level, solutionOf(level, reference)).footprint).toBe(15)
   })
 })

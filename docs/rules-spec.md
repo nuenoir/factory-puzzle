@@ -24,10 +24,23 @@ Explicitly out of scope. Listed so they don't leak in during implementation.
 
 ## 2. Coordinate system
 
-- Square grid, `width × height`, default `7 × 7`. `ASSUMPTION`
-- Origin `(0,0)` is top-left. `x` increases right, `y` increases down.
-- Directions are `N` `E` `S` `W`. `N` = `y-1`, `E` = `x+1`, `S` = `y+1`, `W` = `x-1`.
-- Rotation is one of `0 | 90 | 180 | 270`, applied clockwise. A building's port directions rotate with it.
+- **Pointy-top hexagonal grid**, `width × height`, default `7 × 7`. `ASSUMPTION`
+- Cells are addressed in **odd-r offset coordinates**: `(x, y)` where `y` is the row, origin `(0,0)` top-left, and **odd rows sit half a cell to the right**. Offset rather than axial deliberately — it keeps the level schema's `[x, y]` pairs, a rectangular `width × height` grid, and level files a human can read.
+- Six directions, listed **clockwise**: `E` `SE` `SW` `W` `NW` `NE`.
+- Neighbour offsets depend on row parity. This is the whole of the hex geometry; everything else follows from it:
+
+| Direction | Even `y` | Odd `y` |
+|---|---|---|
+| `E`  | `(x+1, y)`   | `(x+1, y)`   |
+| `SE` | `(x,   y+1)` | `(x+1, y+1)` |
+| `SW` | `(x-1, y+1)` | `(x,   y+1)` |
+| `W`  | `(x-1, y)`   | `(x-1, y)`   |
+| `NW` | `(x-1, y-1)` | `(x,   y-1)` |
+| `NE` | `(x,   y-1)` | `(x+1, y-1)` |
+
+- `E` and `W` are row-aligned on every row, so a west-to-east line runs straight regardless of parity. That is why pointy-top was chosen over flat-top: sources feed east, and the primary flow stays legible.
+- The opposite of a direction is the one three steps away in the clockwise list: `E↔W`, `SE↔NW`, `SW↔NE`.
+- Rotation is one of `0 | 60 | 120 | 180 | 240 | 300`, applied clockwise. A building's port directions rotate with it. `ASSUMPTION`
 
 Each cell holds **at most one building**. Each belt cell holds **at most one item**.
 
@@ -74,18 +87,20 @@ Default `duration` is `2` ticks for Press and Assembler, configured per machine 
 
 ### Port geometry
 
-**Conveyors are the exception: they are defined by an explicit `{in, out}` direction pair, not a rotation.** Any pair where `in ≠ out` is legal, which yields straight belts (`W→E`) and both corners (`W→S`, `W→N`) from a single building type at the same cost of 1.
+**Conveyors are the exception: they are defined by an explicit `{in, out}` direction pair, not a rotation.** Any pair where `in ≠ out` is legal, which on a hex grid yields a straight belt (`W→E`) plus five distinct turns from a single building type at the same cost of 1.
 
 This is not cosmetic. Without corners, every route is a straight line and the puzzle space collapses to nothing. Do not implement conveyors as rotation-only.
 
 All other buildings use `rotation`. At rotation 0:
 
-- Splitter: in `W`, out `N` and `E`
-- Merger: in `W` and `N`, out `E`
+- Splitter: in `W`, out `NE` and `SE` — a symmetric fork
+- Merger: in `NW` and `SW`, out `E` — a symmetric join
 - Press: in `W`, out `E`
-- Assembler: in `W` and `N`, out `E`
+- Assembler: in `W` and `NW`, out `E`
 - **Source**: out `E` (no input)
 - **Sink**: in `W` (no output)
+
+`ASSUMPTION` on the splitter and merger port pairs. A hex cell offers five possible outputs for a `W` input, so the choice has to be made explicitly: the symmetric fork reads unambiguously on screen and rotates to any of six orientations. The assembler deliberately uses a *different* input pair (`W` and `NW`) from the merger so the two are distinguishable at a glance.
 
 A connection exists between two adjacent buildings only if the upstream building's **output port faces** the downstream building, **and** the downstream building's **input port faces back**. Ports that don't face each other are not connected — no implicit adjacency transfer.
 
@@ -116,7 +131,7 @@ Each tick executes these phases in strict order:
 1. **Sinks consume.** For each sink whose **input buffer** holds an item, remove it and increment `delivered[type]`. Sinks accept **every** item type, not just the target. An item is counted the tick *after* it enters the sink (via phase 2, 4, or 8).
 2. **Machines push output.** Any machine with a non-empty output buffer attempts to move that item to the connected building its output port faces. Succeeds only into: an empty connected conveyor cell, an empty machine input buffer **whose filter accepts the type (§8)**, or an empty sink input buffer. On success the output buffer empties. A splitter chooses which of its two outputs to try per §9.
 3. **Belt paths advance.** See §7. Belt resolution moves items **between conveyor cells only** — never into a buffer. Input and sink buffers are filled by phases 2, 4, and 8 exclusively; output buffers by phases 5 and 6. An item pushed onto a conveyor cell in phase 2 is ordinary belt cargo in phase 3 of the same tick — there is no per-item once-per-tick movement limit across phases.
-4. **Machines and sinks pull input.** For each machine input port (and each sink input buffer) that is empty: if the facing cell is a connected conveyor holding an item the port accepts (§8), move that item into the buffer. Port order within one building is `N, E, S, W`. A merger fills **both** input buffers this way; §9 governs the phase-6 transfer, not the pull.
+4. **Machines and sinks pull input.** For each machine input port (and each sink input buffer) that is empty: if the facing cell is a connected conveyor holding an item the port accepts (§8), move that item into the buffer. Port order within one building is the §2 clockwise order, `E, SE, SW, W, NW, NE`. A merger fills **both** input buffers this way; §9 governs the phase-6 transfer, not the pull.
 5. **Machines finish jobs.** Any machine with an active job whose timer has reached `0` places its product into the output buffer — **only if the output buffer is empty**. If occupied, the job stays finished-but-held and the machine stalls.
 6. **Machines start jobs; splitters and mergers transfer.** Any idle machine whose required inputs are all present and which has a valid recipe consumes those inputs and starts a job with `timer = duration`. A machine that finished in phase 5 of this tick is idle here — back-to-back jobs are intended. Splitters and mergers have no recipes; instead, if the output buffer is empty and an input buffer holds an item, move **exactly one** item from input buffer to output buffer (a merger picks which input per §9). An item therefore spends exactly one tick inside a splitter or merger — the same transit time as one conveyor cell. `ASSUMPTION`
 7. **Timers decrement.** Every active job with a timer above `0` decrements it by 1 — including a job started in phase 6 of this same tick. A job started on tick `T` with duration `d` places its product in phase 5 of tick `T + d` and can push it in phase 2 of tick `T + d + 1`. The timer **stops at 0** and does not go negative: a finished-but-held job (phase 5) would otherwise change state every tick forever, and a permanently stalled machine would never reach the fixpoint that `jammed` is defined by (§13). `ASSUMPTION`
@@ -164,7 +179,7 @@ Consequences, all intended:
 
 Splitters and mergers each hold a `next` flag persisting across ticks.
 
-- **Port order.** The two ports are indexed `[0, 1]` in the order §4 lists them at rotation 0 — splitter outputs `[N, E]`, merger inputs `[W, N]` — and the indices rotate with the building. `ASSUMPTION`
+- **Port order.** The two ports are indexed `[0, 1]` in the order §4 lists them at rotation 0 — splitter outputs `[NE, SE]`, merger inputs `[NW, SW]` — and the indices rotate with the building. `ASSUMPTION`
 - **Initial value.** `next = 0` when a run starts; run-reset sets it back to `0`. `ASSUMPTION`
 - **Splitter** (runs in phase 2). Try the output indicated by `next`. If it cannot accept, try the other. If either succeeds, flip `next`. If both are blocked, the item waits and `next` does not change.
 - **Merger** (runs in the phase-6 transfer). Take from the input indicated by `next` if its buffer holds an item, else from the other. If either yields an item, move it to the output buffer and flip `next`. If both are empty, nothing happens and `next` does not change. (Phase 4 fills both merger input buffers unconditionally; `next` chooses only which one feeds the output.)

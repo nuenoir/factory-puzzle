@@ -156,8 +156,8 @@ export function validateSolution(level: Level, solution: Solution): ValidationEr
       if (placement.in === undefined || placement.out === undefined) {
         errors.push({ code: 'conveyor_missing_ports', message: `Conveyor at (${x}, ${y}) needs both "in" and "out".`, ...at })
       } else if (!isDirection(placement.in) || !isDirection(placement.out)) {
-        // §2: N, E, S, W are the only directions that exist.
-        errors.push({ code: 'invalid_direction', message: `Conveyor at (${x}, ${y}) has a direction outside N/E/S/W.`, ...at })
+        // §2: the six hex directions are the only ones that exist.
+        errors.push({ code: 'invalid_direction', message: `Conveyor at (${x}, ${y}) has a direction outside E/SE/SW/W/NW/NE.`, ...at })
       } else if (placement.in === placement.out) {
         errors.push({ code: 'conveyor_in_equals_out', message: `Conveyor at (${x}, ${y}) has in === out ("${placement.in}"); §4 requires them to differ.`, ...at })
       }

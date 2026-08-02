@@ -28,7 +28,7 @@ describe('§13 solution validation', () => {
   })
 
   it('rejects two placements on one cell', () => {
-    expect(codesFor([belt(1, 1, 'W', 'E'), belt(1, 1, 'N', 'S')])).toContain('overlapping_placement')
+    expect(codesFor([belt(1, 1, 'W', 'E'), belt(1, 1, 'NE', 'SW')])).toContain('overlapping_placement')
   })
 
   it('rejects building on a source or sink cell', () => {

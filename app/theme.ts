@@ -3,19 +3,39 @@
 import type { BuildingType, ItemType } from '@factory/sim'
 
 /** Cell size is computed from the viewport; these bound it. Android is a
- *  target (CLAUDE.md), and a fixed 58px cell puts a 7-wide board off the edge
+ *  target (CLAUDE.md), and a fixed cell width puts a 7-wide board off the edge
  *  of a phone screen with no way to scroll to it. */
-export const MAX_CELL = 58
-export const MIN_CELL = 32
-export const GAP = 3
-/** Thickness of the bars drawn on a cell edge to mark a port. */
-export const PORT = 4
+export const MAX_CELL = 62
+export const MIN_CELL = 34
+export const GAP = 2
 
-/** The largest cell that fits `columns` of board inside `available` pixels. */
+/**
+ * A pointy-top hexagon is taller than it is wide by 2/√3, and rows overlap:
+ * each row sits three quarters of a hex height below the last, with odd rows
+ * pushed half a hex to the right (§2, odd-r offset).
+ */
+export const HEX_RATIO = 2 / Math.sqrt(3)
+export const hexHeight = (w: number): number => w * HEX_RATIO
+export const rowStep = (w: number): number => hexHeight(w) * 0.75
+
+/** The largest hex width that fits `columns` of board inside `available` px. */
 export function cellSizeFor(available: number, columns: number): number {
-  const usable = available - GAP * 4
-  const size = Math.floor(usable / columns) - GAP
+  // Odd rows overhang by half a hex, so the board spans (columns + 0.5) hexes.
+  const size = Math.floor((available - GAP * 2) / (columns + 0.5))
   return Math.max(MIN_CELL, Math.min(MAX_CELL, size))
+}
+
+/** Board pixel size for a `columns × rows` hex grid of hex width `w`. */
+export function boardSize(w: number, columns: number, rows: number) {
+  return {
+    width: w * (columns + 0.5),
+    height: hexHeight(w) * 0.25 + rowStep(w) * rows,
+  }
+}
+
+/** Top-left of a cell's bounding box, in board pixels. */
+export function cellOrigin(x: number, y: number, w: number) {
+  return { left: x * w + (y % 2 === 1 ? w / 2 : 0), top: y * rowStep(w) }
 }
 
 export const colors = {
@@ -63,4 +83,4 @@ export function itemColor(type: ItemType): string {
 }
 
 /** Arrow glyphs, used to show which way a conveyor or output port points. */
-export const arrow = { N: '↑', E: '→', S: '↓', W: '←' } as const
+export const arrow = { E: '→', SE: '↘', SW: '↙', W: '←', NW: '↖', NE: '↗' } as const

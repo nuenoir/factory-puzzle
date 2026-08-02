@@ -14,9 +14,9 @@ import { belt, buildWorld, cellAt, machine, makeLevel, solutionOf } from './help
 
 describe('§4 connection rule', () => {
   it('does not transfer between adjacent belts whose ports do not face each other', () => {
-    // (1,1) points east at (2,1), but (2,1) takes its input from the north.
+    // (1,1) points east at (2,1), but (2,1) takes its input from the north-east.
     // §4: both halves must face, or there is no connection at all.
-    const world = buildWorld(makeLevel(), [belt(1, 1, 'W', 'E'), belt(2, 1, 'N', 'S')])
+    const world = buildWorld(makeLevel(), [belt(1, 1, 'W', 'E'), belt(2, 1, 'NE', 'SW')])
     seedItems(world, [{ pos: [1, 1], item: 'x' }])
 
     for (let i = 0; i < 5; i += 1) step(world)
@@ -27,8 +27,8 @@ describe('§4 connection rule', () => {
 
   it('does not let a source emit into a building whose input faces elsewhere', () => {
     const level = makeLevel({ sources: [{ pos: [0, 3], rotation: 0, emits: 'circle' }] })
-    // The press faces north, not back at the source to its west.
-    const world = buildWorld(level, [machine('press', 1, 3, 90)])
+    // Rotated 60°, the press takes from NW — not back at the source to its west.
+    const world = buildWorld(level, [machine('press', 1, 3, 60)])
 
     for (let i = 0; i < 5; i += 1) step(world)
 
@@ -80,11 +80,12 @@ describe('§8 input filters apply on every route into a buffer', () => {
 
 describe('§3 assembler recipes are unordered pairs', () => {
   it('matches a pair supplied in the opposite order to the recipe', () => {
-    // Recipe is [disc, plate]; the W port receives plate and the N port disc.
+    // Recipe is [disc, plate]; the W port receives plate and the NW port disc.
+    // The NW feeder sits at (1,2) rotated 60°, turning its E output into SE.
     const level = makeLevel({
       sources: [
         { pos: [0, 3], rotation: 0, emits: 'plate' },
-        { pos: [1, 2], rotation: 90, emits: 'disc' },
+        { pos: [1, 2], rotation: 60, emits: 'disc' },
       ],
       sinks: [{ pos: [2, 3], rotation: 0 }],
       recipes: { assembler: [{ in: ['disc', 'plate'], out: 'widget' }] },

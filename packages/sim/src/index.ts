@@ -37,7 +37,7 @@ export {
   type WorldResult,
 } from './world'
 export { validateLevel, validateSolution } from './validate'
-export { DELTA, opposite, rotate, portsFor, gridOrder } from './geometry'
+export { neighbourOf, opposite, rotate, portsFor, gridOrder } from './geometry'
 export {
   COST,
   DIRECTIONS,

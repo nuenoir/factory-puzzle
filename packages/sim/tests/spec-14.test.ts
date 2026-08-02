@@ -9,6 +9,10 @@
  * the mechanic directly rather than inferring it from item counts: the splitter
  * and merger cases read the actual push/transfer target every tick, so a
  * round-robin flag that never flips fails them.
+ *
+ * The grid is pointy-top hex in odd-r offset coordinates (§2). `E` and `W` are
+ * row-aligned on every row, so straight-line fixtures read the same as they
+ * would on a square grid; anything that turns depends on row parity.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -94,18 +98,20 @@ describe('§14.3 back-pressure', () => {
 })
 
 /**
- * Splitter fixture whose branches each end in their own sink one cell away.
- * A sink's input buffer holds the item for exactly the tick it arrived, so
- * reading the two buffers after each step reports which output the splitter
- * actually pushed to — no inference from branch item counts.
+ * Splitter fixture. At rotation 0 a splitter takes from `W` and forks to `NE`
+ * and `SE` (§4). From (2,3) — an odd row — those are (3,2) and (3,4).
+ *
+ * Each branch is one conveyor into its own sink. A sink's input buffer holds
+ * the item for exactly the tick it arrived, so reading the two buffers after
+ * each step reports which output the splitter actually chose.
  */
-function splitterWorld(includeEastBranch: boolean): World {
-  const sinks: Array<{ pos: PosTuple; rotation: Rotation }> = [{ pos: [2, 1], rotation: 270 }]
-  const placements = [belt(1, 3, 'W', 'E'), machine('splitter', 2, 3, 0), belt(2, 2, 'S', 'N')]
+function splitterWorld(includeSouthBranch: boolean): World {
+  const sinks: Array<{ pos: PosTuple; rotation: Rotation }> = [{ pos: [4, 2], rotation: 0 }]
+  const placements = [belt(1, 3, 'W', 'E'), machine('splitter', 2, 3, 0), belt(3, 2, 'SW', 'E')]
 
-  if (includeEastBranch) {
-    sinks.push({ pos: [4, 3], rotation: 0 })
-    placements.push(belt(3, 3, 'W', 'E'))
+  if (includeSouthBranch) {
+    sinks.push({ pos: [4, 4], rotation: 0 })
+    placements.push(belt(3, 4, 'NW', 'E'))
   }
 
   const level = makeLevel({
@@ -117,27 +123,27 @@ function splitterWorld(includeEastBranch: boolean): World {
 }
 
 /** Which branch received a push on each tick, read off the two sink buffers. */
-function pushSequence(world: World, ticks: number, hasEast: boolean): string[] {
+function pushSequence(world: World, ticks: number, hasSouth: boolean): string[] {
   const seq: string[] = []
   for (let i = 0; i < ticks; i += 1) {
     step(world)
-    const north = cellAt(world, [2, 1]).inputs.get('S') ?? null
-    const east = hasEast ? cellAt(world, [4, 3]).inputs.get('W') ?? null : null
+    const north = cellAt(world, [4, 2]).inputs.get('W') ?? null
+    const south = hasSouth ? cellAt(world, [4, 4]).inputs.get('W') ?? null : null
     // One output buffer means at most one push per tick (§5).
-    expect(north !== null && east !== null).toBe(false)
-    if (north !== null) seq.push('N')
-    if (east !== null) seq.push('E')
+    expect(north !== null && south !== null).toBe(false)
+    if (north !== null) seq.push('NE')
+    if (south !== null) seq.push('SE')
   }
   return seq
 }
 
 describe('§14.4 splitter alternation', () => {
-  it('pushes N, E, N, E, N, E with both branches open', () => {
+  it('pushes NE, SE, NE, SE, NE, SE with both branches open', () => {
     const world = splitterWorld(true)
     const seq = pushSequence(world, 20, true)
 
     expect(seq.length).toBeGreaterThanOrEqual(6)
-    expect(seq.slice(0, 6)).toEqual(['N', 'E', 'N', 'E', 'N', 'E'])
+    expect(seq.slice(0, 6)).toEqual(['NE', 'SE', 'NE', 'SE', 'NE', 'SE'])
   })
 })
 
@@ -147,7 +153,7 @@ describe('§14.5 splitter with one output blocked', () => {
     const seq = pushSequence(world, 20, false)
 
     expect(seq.length).toBeGreaterThanOrEqual(6)
-    expect(seq.every((d) => d === 'N')).toBe(true)
+    expect(seq.every((d) => d === 'NE')).toBe(true)
   })
 
   it('keeps flipping next on fallback successes, so it never desyncs', () => {
@@ -157,7 +163,7 @@ describe('§14.5 splitter with one output blocked', () => {
     for (let i = 0; i < 12; i += 1) {
       step(world)
       // Record the flag only on ticks that actually pushed.
-      if ((cellAt(world, [2, 1]).inputs.get('S') ?? null) !== null) {
+      if ((cellAt(world, [4, 2]).inputs.get('W') ?? null) !== null) {
         flags.push(cellAt(world, [2, 3]).next)
       }
     }
@@ -214,13 +220,22 @@ describe('§14.6 machine stall', () => {
   })
 })
 
+/**
+ * An assembler at (1,3) takes from `W` (0,3) and `NW` (1,2) at rotation 0.
+ * The second source sits at (1,2) rotated 60°, turning its `E` output into
+ * `SE`, which on an even row points at (1,3).
+ */
+const twoSourceAssembler = (emitsW: string, emitsNW: string) => ({
+  sources: [
+    { pos: [0, 3] as PosTuple, rotation: 0 as Rotation, emits: emitsW },
+    { pos: [1, 2] as PosTuple, rotation: 60 as Rotation, emits: emitsNW },
+  ],
+})
+
 describe('§14.7 assembler deadlock', () => {
   it('deadlocks permanently on two items that form no recipe pair', () => {
     const level = makeLevel({
-      sources: [
-        { pos: [0, 3], rotation: 0, emits: 'disc' },
-        { pos: [1, 2], rotation: 90, emits: 'disc' },
-      ],
+      ...twoSourceAssembler('disc', 'disc'),
       recipes: { assembler: [{ in: ['disc', 'plate'], out: 'widget' }] },
       target: { type: 'widget', count: 1 },
     })
@@ -237,10 +252,7 @@ describe('§14.7 assembler deadlock', () => {
     // both ports accept one even though disc+disc assembles nothing. A
     // pair-aware implementation would leave the second buffer empty.
     const level = makeLevel({
-      sources: [
-        { pos: [0, 3], rotation: 0, emits: 'disc' },
-        { pos: [1, 2], rotation: 90, emits: 'disc' },
-      ],
+      ...twoSourceAssembler('disc', 'disc'),
       recipes: { assembler: [{ in: ['disc', 'plate'], out: 'widget' }] },
     })
     const world = buildWorld(level, [machine('assembler', 1, 3, 0)])
@@ -249,7 +261,7 @@ describe('§14.7 assembler deadlock', () => {
 
     const assembler = cellAt(world, [1, 3])
     expect(assembler.inputs.get('W')).toBe('disc')
-    expect(assembler.inputs.get('N')).toBe('disc')
+    expect(assembler.inputs.get('NW')).toBe('disc')
     expect(assembler.job).toBeNull()
   })
 
@@ -264,33 +276,34 @@ describe('§14.7 assembler deadlock', () => {
 
     const assembler = cellAt(world, [2, 3])
     expect(assembler.inputs.get('W')).toBeNull()
-    expect(assembler.inputs.get('N')).toBeNull()
+    expect(assembler.inputs.get('NW')).toBeNull()
     expect(cellAt(world, [1, 3]).item).toBe('rock')
     expect(conservationHolds(world)).toBe(true)
   })
 })
 
-describe('§14.8 determinism', () => {
-  const level = makeLevel({
-    sources: [{ pos: [0, 3], rotation: 0, emits: 'circle' }],
-    sinks: [{ pos: [6, 3], rotation: 0 }],
-    recipes: { press: { circle: 'disc' }, assembler: [{ in: ['disc', 'disc'], out: 'widget' }] },
-  })
-  const placements = [
-    belt(1, 3, 'W', 'E'),
-    machine('press', 2, 3, 0),
-    machine('splitter', 3, 3, 0),
-    belt(4, 3, 'W', 'E'),
-    belt(3, 2, 'S', 'E'),
-    belt(4, 2, 'W', 'E'),
-    belt(5, 2, 'W', 'S'),
-    machine('assembler', 5, 3, 0),
-  ]
+/** The level-001 reference solution; see docs/level-001.md for the geometry. */
+const referenceLevel = makeLevel({
+  sources: [{ pos: [0, 3], rotation: 0, emits: 'circle' }],
+  sinks: [{ pos: [6, 3], rotation: 0 }],
+  recipes: { press: { circle: 'disc' }, assembler: [{ in: ['disc', 'disc'], out: 'widget' }] },
+})
+const referencePlacements = [
+  belt(1, 3, 'W', 'E'),
+  machine('press', 2, 3, 0),
+  machine('splitter', 3, 3, 0),
+  belt(4, 2, 'SW', 'E'),
+  belt(5, 2, 'W', 'SE'),
+  belt(4, 4, 'NW', 'NE'),
+  belt(4, 3, 'SW', 'E'),
+  machine('assembler', 5, 3, 0),
+]
 
+describe('§14.8 determinism', () => {
   it('produces a byte-identical result across 100 runs', () => {
-    const first = JSON.stringify(simulate(level, solutionOf(level, placements)))
+    const first = JSON.stringify(simulate(referenceLevel, solutionOf(referenceLevel, referencePlacements)))
     for (let i = 0; i < 99; i += 1) {
-      expect(JSON.stringify(simulate(level, solutionOf(level, placements)))).toBe(first)
+      expect(JSON.stringify(simulate(referenceLevel, solutionOf(referenceLevel, referencePlacements)))).toBe(first)
     }
   })
 
@@ -298,7 +311,7 @@ describe('§14.8 determinism', () => {
     // §13 makes the serialised form part of the determinism contract, so the
     // scalars in SimResult are not enough on their own.
     const trace = (): string[] => {
-      const world = buildWorld(level, placements)
+      const world = buildWorld(referenceLevel, referencePlacements)
       return Array.from({ length: 30 }, () => {
         step(world)
         return stateKey(world)
@@ -311,20 +324,23 @@ describe('§14.8 determinism', () => {
 })
 
 describe('§14.9 cyclic belt', () => {
+  /**
+   * The tightest hex loop is three cells: (1,1) --E--> (2,1) --SW--> (2,2)
+   * --NW--> (1,1). Row parity is what makes three work; on a square grid the
+   * smallest loop is four.
+   */
   const loop: PosTuple[] = [
     [1, 1],
     [2, 1],
     [2, 2],
-    [1, 2],
   ]
-  const loopBelts = [belt(1, 1, 'S', 'E'), belt(2, 1, 'W', 'S'), belt(2, 2, 'N', 'W'), belt(1, 2, 'E', 'N')]
+  const loopBelts = [belt(1, 1, 'SE', 'E'), belt(2, 1, 'W', 'SW'), belt(2, 2, 'NE', 'NW')]
 
   it('rotates one cell per tick when a gap exists', () => {
     const world = buildWorld(makeLevel(), loopBelts)
     seedItems(world, [
       { pos: [1, 1], item: 'a' },
       { pos: [2, 1], item: 'b' },
-      { pos: [2, 2], item: 'c' },
     ])
 
     step(world)
@@ -332,7 +348,6 @@ describe('§14.9 cyclic belt', () => {
     expect(cellAt(world, [1, 1]).item).toBeNull()
     expect(cellAt(world, [2, 1]).item).toBe('a')
     expect(cellAt(world, [2, 2]).item).toBe('b')
-    expect(cellAt(world, [1, 2]).item).toBe('c')
   })
 
   it('does not move when saturated, and does not crash', () => {
@@ -350,21 +365,7 @@ describe('§14.9 cyclic belt', () => {
 
 describe('§14.10 loss conservation', () => {
   it('holds every tick while a full factory runs', () => {
-    const level = makeLevel({
-      sources: [{ pos: [0, 3], rotation: 0, emits: 'circle' }],
-      sinks: [{ pos: [6, 3], rotation: 0 }],
-      recipes: { press: { circle: 'disc' }, assembler: [{ in: ['disc', 'disc'], out: 'widget' }] },
-    })
-    const world = buildWorld(level, [
-      belt(1, 3, 'W', 'E'),
-      machine('press', 2, 3, 0),
-      machine('splitter', 3, 3, 0),
-      belt(4, 3, 'W', 'E'),
-      belt(3, 2, 'S', 'E'),
-      belt(4, 2, 'W', 'E'),
-      belt(5, 2, 'W', 'S'),
-      machine('assembler', 5, 3, 0),
-    ])
+    const world = buildWorld(referenceLevel, referencePlacements)
 
     // tick() already throws on a violation; this pins the arithmetic too, so a
     // ledger that drifted in lockstep with itemsInWorld would still be caught.
@@ -383,19 +384,22 @@ describe('§14.10 loss conservation', () => {
 })
 
 /**
- * Merger fixture. Reading `output` after each step reports the item the merger
- * transferred in phase 6 of that tick, which is a direct observation of which
- * input §9 selected.
+ * Merger fixture. At rotation 0 a merger takes from `NW` and `SW` and pushes
+ * `E` (§4). From (2,2) — an even row — those inputs are (1,1) and (1,3).
+ *
+ * The output belt is a single cell feeding a sink, so the sink's buffer holds
+ * exactly one item per tick: reading it recovers the merged stream in order
+ * even when both inputs carry the same type.
  */
-function mergerWorld(feedNorth: boolean): World {
+function mergerWorld(feedSouth: boolean): World {
   const sources: Array<{ pos: PosTuple; rotation: Rotation; emits: string }> = [
-    { pos: [0, 2], rotation: 0, emits: 'a' },
+    { pos: [0, 1], rotation: 0, emits: 'a' },
   ]
-  const placements = [belt(1, 2, 'W', 'E'), machine('merger', 2, 2, 0), belt(3, 2, 'W', 'E')]
+  const placements = [belt(1, 1, 'W', 'SE'), machine('merger', 2, 2, 0), belt(3, 2, 'W', 'E')]
 
-  if (feedNorth) {
-    sources.push({ pos: [2, 0], rotation: 90, emits: 'b' })
-    placements.push(belt(2, 1, 'N', 'S'))
+  if (feedSouth) {
+    sources.push({ pos: [0, 3], rotation: 0, emits: 'b' })
+    placements.push(belt(1, 3, 'W', 'NE'))
   }
 
   const level = makeLevel({
@@ -406,11 +410,6 @@ function mergerWorld(feedNorth: boolean): World {
   return buildWorld(level, placements)
 }
 
-/**
- * The merged stream in arrival order. The output belt is a single cell feeding
- * the sink, so the sink's buffer holds exactly one item per tick — reading it
- * after each step recovers the stream even when both inputs carry equal types.
- */
 function mergedStream(world: World, ticks: number): string[] {
   const stream: string[] = []
   for (let i = 0; i < ticks; i += 1) {
@@ -422,12 +421,12 @@ function mergedStream(world: World, ticks: number): string[] {
 }
 
 describe('§14.11 merger alternation', () => {
-  it('alternates W, N, W, N with both inputs saturated', () => {
+  it('alternates NW, SW, NW, SW with both inputs saturated', () => {
     const world = mergerWorld(true)
     const stream = mergedStream(world, 25)
 
     expect(stream.length).toBeGreaterThanOrEqual(6)
-    // next starts at index 0 = W, so the W stream ("a") goes first.
+    // next starts at index 0 = NW, so the NW stream ("a") goes first.
     expect(stream.slice(0, 6)).toEqual(['a', 'b', 'a', 'b', 'a', 'b'])
   })
 })

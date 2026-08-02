@@ -5,11 +5,15 @@
  * game engine and the Phase 3 validator, so it stays free of UI imports.
  */
 
-/** §2. Clockwise order — `rotate` depends on it, and §9 indexes ports by it. */
-export const DIRECTIONS = ['N', 'E', 'S', 'W'] as const
+/**
+ * §2. Six directions on a pointy-top hex, in clockwise order — `rotate` and
+ * `opposite` both depend on that order, and §9 indexes ports by it.
+ */
+export const DIRECTIONS = ['E', 'SE', 'SW', 'W', 'NW', 'NE'] as const
 export type Direction = (typeof DIRECTIONS)[number]
 
-export const ROTATIONS = [0, 90, 180, 270] as const
+/** §2. 60° steps, clockwise. */
+export const ROTATIONS = [0, 60, 120, 180, 240, 300] as const
 export type Rotation = (typeof ROTATIONS)[number]
 
 /** Levels and solutions store positions as `[x, y]`; §2, §12. */
