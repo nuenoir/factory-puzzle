@@ -15,3 +15,14 @@ export {
 } from './chemistry'
 
 export { routeBelts, type Grid, type PortRef } from './router'
+
+export {
+  enumeratePlans,
+  canonicalPlan,
+  machineCostOf,
+  DEFAULT_PLAN_LIMITS,
+  type Plan,
+  type PlanNode,
+  type PlanNodeKind,
+  type PlanLimits,
+} from './planner'
