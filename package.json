@@ -10,7 +10,8 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit && tsc --noEmit -p app",
-    "web": "npm run web --workspace app"
+    "web": "npm run web --workspace app",
+    "build:web": "npm run build:web --workspace app"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
