@@ -51,17 +51,21 @@ Do not add dependencies without asking. This project should stay boring.
 
 ## Current phase
 
-**Phase 2 — playable web MVP.**
+**Phase 3 — generation and validation. This is the portfolio piece.**
 
-In scope right now: `app/` — grid render, building palette, drag-to-place belts, rotation, delete, run/pause/reset, jam markers, score against par. One hardcoded puzzle (`levels/001.json`), deployed to a URL.
+In scope right now: `packages/gen/` — a generator that proposes levels, and a validator that accepts or rejects them against four criteria. `docs/generation-spec.md` is authoritative for this phase the way `rules-spec.md` is for the simulator.
+
+**The rejection log is the deliverable, not a by-product.** The roadmap's gate is 50+ generated puzzles run through the validator with the breakdown written up. Log every rejection with its reason, in a form that can be counted.
 
 Explicitly **not** in scope yet, do not build these even if they seem quick:
 
-- Puzzle generation or the validator (Phase 3)
 - Daily rotation, sharing, streaks (Phase 4)
 - Store assets, analytics, accounts
+- More UI polish. Phase 2 shipped; leave it alone unless a generated level exposes a real bug.
 
-**Phase 1 is done and locked.** `packages/sim/` passes all twelve §14 cases plus a `spec-invariants` suite, verified falsifiable by mutation testing. Treat it as settled: if the UI wants a behaviour change, that is a spec change first (§15, then tests, then code) — not an edit to the simulator to make a screen look right.
+**Phases 1 and 2 are done.** `packages/sim/` passes all twelve §14 cases plus a `spec-invariants` suite, verified falsifiable by mutation testing. Treat it as settled: if generation wants a behaviour change, that is a spec change first (§15, then tests, then code) — not an edit to the simulator to make a search terminate.
+
+The validator **is** `simulate`. That is why the simulator has no rendering imports and no randomness — headless batch validation is the whole reason for that rule. If you find yourself wanting to import anything from `app/` into a validator, stop.
 
 The UI drives the sim through the §13 stepping API — `createWorld`, `step`, `snapshot` — not by calling `simulate` and animating a guess. `snapshot` is the render input.
 
