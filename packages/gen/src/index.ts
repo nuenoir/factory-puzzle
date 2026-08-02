@@ -12,9 +12,9 @@ export {
   machineFloor,
   type MachineFloor,
   type ProducerType,
-} from './chemistry'
+} from './chemistry.ts'
 
-export { routeBelts, type Grid, type PortRef } from './router'
+export { routeBelts, type Grid, type PortRef } from './router.ts'
 
 export {
   enumeratePlans,
@@ -25,6 +25,32 @@ export {
   type PlanNode,
   type PlanNodeKind,
   type PlanLimits,
-} from './planner'
+} from './planner.ts'
 
-export { solve, DEFAULT_SEARCH_LIMITS, type SearchLimits, type SolveOutcome } from './solver'
+export { solve, DEFAULT_SEARCH_LIMITS, type SearchLimits, type SolveOutcome, type AttemptTally } from './solver.ts'
+
+export {
+  validate,
+  withComputedPar,
+  DEFAULT_CRITERIA,
+  type Criteria,
+  type RejectionCode,
+  type Verdict,
+} from './validator.ts'
+
+export {
+  generateLevel,
+  DEFAULT_GENERATOR_OPTIONS,
+  type GeneratorOptions,
+} from './generator.ts'
+
+export {
+  runBatch,
+  summarise,
+  toJsonl,
+  DEFAULT_BATCH_OPTIONS,
+  type BatchOptions,
+  type BatchResult,
+  type BatchSummary,
+  type CandidateRecord,
+} from './batch.ts'

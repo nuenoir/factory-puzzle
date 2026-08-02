@@ -26,8 +26,8 @@ import {
   type Solution,
 } from '@factory/sim'
 
-import { routeBelts } from './router'
-import { canonicalPlan, enumeratePlans, type Plan, type PlanNode } from './planner'
+import { routeBelts } from './router.ts'
+import { canonicalPlan, enumeratePlans, type Plan, type PlanNode } from './planner.ts'
 
 export interface SearchLimits {
   /** Random restarts tried per plan. */

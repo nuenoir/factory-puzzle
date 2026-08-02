@@ -6,6 +6,8 @@
     "moduleResolution": "bundler",
     "strict": true,
     "noEmit": true,
+    // Only the generator CLI uses a .ts specifier; plain Node needs it.
+    "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,

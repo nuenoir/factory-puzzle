@@ -1,6 +1,6 @@
 /** Hex grid and port geometry. docs/rules-spec.md §2 and §4. */
 
-import { DIRECTIONS, type BuildingType, type Direction, type Rotation } from './types'
+import { DIRECTIONS, type BuildingType, type Direction, type Rotation } from './types.ts'
 
 /**
  * §2. Pointy-top hexes in odd-r offset coordinates: odd rows sit half a cell

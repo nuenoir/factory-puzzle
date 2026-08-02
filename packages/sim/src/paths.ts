@@ -8,8 +8,8 @@
  * gesture, and the Phase 3 router laying belts between machines it placed.
  */
 
-import { neighbourOf, opposite } from './geometry'
-import { DIRECTIONS, type Direction, type Placement, type PosTuple } from './types'
+import { neighbourOf, opposite } from './geometry.ts'
+import { DIRECTIONS, type Direction, type Placement, type PosTuple } from './types.ts'
 
 /** The direction from `from` to `to`, or null if they are not neighbours. */
 export function directionBetween(from: PosTuple, to: PosTuple): Direction | null {

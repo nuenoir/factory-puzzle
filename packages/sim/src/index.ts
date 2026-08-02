@@ -14,8 +14,8 @@
 /** The rules-spec version this package implements. Bump only alongside the spec. */
 export const SPEC_VERSION = '0.2'
 
-export { simulate, step } from './simulate'
-export { tick, hasWon, CONSERVATION } from './tick'
+export { simulate, step } from './simulate.ts'
+export { tick, hasWon, CONSERVATION } from './tick.ts'
 export {
   createWorld,
   snapshot,
@@ -35,10 +35,10 @@ export {
   type Ledger,
   type World,
   type WorldResult,
-} from './world'
-export { validateLevel, validateSolution } from './validate'
-export { neighbourOf, opposite, rotate, portsFor, gridOrder } from './geometry'
-export { beltsFromPath, directionBetween, type PathEnds } from './paths'
+} from './world.ts'
+export { validateLevel, validateSolution } from './validate.ts'
+export { neighbourOf, opposite, rotate, portsFor, gridOrder } from './geometry.ts'
+export { beltsFromPath, directionBetween, type PathEnds } from './paths.ts'
 export {
   COST,
   DIRECTIONS,
@@ -59,4 +59,4 @@ export {
   type SimResult,
   type Solution,
   type ValidationError,
-} from './types'
+} from './types.ts'

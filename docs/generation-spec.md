@@ -29,9 +29,11 @@ Varied per candidate:
 | `sinks` | 1 | Position on the east edge. |
 | `recipes.press` | 1–3 entries | A one-to-one type map. |
 | `recipes.assembler` | 0–2 pairs | Unordered; duplicates rejected at load (rules-spec §3). |
-| `target` | derived | Must be a type the chemistry can actually produce (§4 stage A). |
+| `target` | any type the recipes mention | Deliberately *not* pre-checked for reachability. |
 | `available` | subset | Always includes `conveyor`. |
 | `max_ticks` | 300 | Fixed. `ASSUMPTION` |
+
+**The generator does not pre-filter.** It proposes; the validator disposes. Screening candidates for reachability before submitting them would make stage A dead code and hollow out the rejection log — the breakdown is only interesting if the generator is genuinely allowed to be wrong. `ASSUMPTION`
 
 **`par` is not proposed.** It is *computed* by the validator as the cost of the cheapest solution found, and carries the same caveat as level-001: verified, not proven optimal. A generator that guessed par would be inventing the one number the level is scored against. `ASSUMPTION`
 

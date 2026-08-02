@@ -3,7 +3,9 @@
   "compilerOptions": {
     "strict": true,
     "noEmit": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    // packages/sim uses .ts specifiers so the generator CLI can run on Node.
+    "allowImportingTsExtensions": true
   },
   "include": ["**/*.ts", "**/*.tsx", "../levels/*.json"],
   "exclude": ["node_modules", ".expo"]

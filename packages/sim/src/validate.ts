@@ -14,7 +14,7 @@ import {
   type Level,
   type Solution,
   type ValidationError,
-} from './types'
+} from './types.ts'
 
 function isPos(value: unknown): value is readonly [number, number] {
   return Array.isArray(value) && value.length === 2 && Number.isInteger(value[0]) && Number.isInteger(value[1])
