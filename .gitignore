@@ -2,6 +2,9 @@ node_modules/
 dist/
 coverage/
 .expo/
+
+# Private planning notes — kept on disk, deliberately out of the public repo.
+docs/roadmap.md
 *.tsbuildinfo
 .DS_Store
 Thumbs.db
