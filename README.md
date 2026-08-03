@@ -3,7 +3,7 @@
 A daily factory-automation puzzle on a hex grid. Route items from sources, through
 transformations, into a sink — scored against par like golf.
 
-**[Play it](https://nuenoir.github.io/factory-puzzle/)**
+**[Play it](https://nuenoir.github.io/factory-puzzle/)** · **[Engineering note](docs/writeup.md)** — how the generator works, what it is allowed to claim, and what surprised me
 
 ## What's interesting here
 
