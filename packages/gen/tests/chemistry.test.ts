@@ -76,6 +76,27 @@ describe('§4 stage A — reachability', () => {
     })
     expect([...reachableTypes(cyclic)].sort()).toEqual(['circle', 'disc'])
   })
+
+  it('ignores recipes whose machine the level does not offer', () => {
+    // A press recipe is not a route to anything if the level has no press.
+    // Catching this at stage A makes it a proof, and free, instead of a
+    // bounded search that finds nothing and can conclude far less.
+    const noPress = makeLevel({
+      available: ['conveyor', 'assembler'],
+      recipes: level001.recipes,
+    })
+    expect([...reachableTypes(noPress)]).toEqual(['circle'])
+    expect(isProducible(noPress)).toBe(false)
+  })
+
+  it('ignores assembler recipes when no assembler is available', () => {
+    const noAssembler = makeLevel({
+      available: ['conveyor', 'press'],
+      recipes: level001.recipes,
+    })
+    expect([...reachableTypes(noAssembler)].sort()).toEqual(['circle', 'disc'])
+    expect(isProducible(noAssembler)).toBe(false)
+  })
 })
 
 describe('§4 stage B — machine floor', () => {

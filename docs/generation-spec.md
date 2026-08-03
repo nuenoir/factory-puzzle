@@ -78,11 +78,27 @@ Never trust the router. If routing and simulation disagree, the simulator is rig
 
 Two things the enumerator must fix before a plan is buildable, both of them splitters. Independent chains drawing on one source produce two *copies* of it, but the level has one, at one cell. And once merged, a node may feed more consumer ports than it has outputs. This is not bookkeeping: it is why level 001's second route costs 21 rather than 18, because split-then-press has to buy its splitter too. A lone source with no splitter available cannot supply an assembler at all, and the level is then genuinely unsolvable.
 
-### Observed hit rate
+### Observed behaviour
 
 Random restarts are cheap but wasteful. On level 001, roughly **1.5% of attempts** produce a winning layout; almost every failure is a routing failure, where the machines landed somewhere the belts could not connect. Both plans are found comfortably within the default allowance.
 
-That number is the tuning signal. If the log shows `no_solution_found` dominating on levels that look solvable, the fix is a better placement heuristic, not a bigger attempt cap. Recorded here so the write-up can quote it and so a future change has a baseline to beat.
+**Fifty candidates from seed 1**, after the generator was taught to build recipe chains forward from its sources:
+
+| Outcome | Count | Claim |
+|---|---|---|
+| accepted | 3 | — |
+| `no_solution_found` | 22 | bounded |
+| `single_solution` | 15 | bounded |
+| `unsolvable_chemistry` | 6 | proven |
+| `over_budget` | 4 | bounded |
+
+`no_solution_found` dominating is the signal that **the search, not the chemistry, is now the limit**. Among those candidates every single attempt died at routing — none reached simulation — which is the shape of a systematic problem rather than bad luck.
+
+Two tuning changes were measured against this batch. Varying the order belts are routed in helped: accepted 2 → 3, `no_solution_found` 23 → 22. Sampling runner-up rotations instead of always taking the best-aligned one **hurt**, pushing `no_solution_found` from 23 to 29, because attempts spent on worse orientations are attempts not spent on fresh placements. It was reverted. Recording the negative result matters as much as the positive one: it is the evidence against the obvious next idea.
+
+All three accepted levels share the same shape — an assembler consuming two of one item — because that is what creates the press-then-split versus split-then-press choice. Criterion 4 is therefore selecting for level 001's structure, which is reassuring and also a limitation: the generator currently has one way of making a puzzle interesting.
+
+The honest summary is that this search finds *a* solution often enough to judge a level, and is nowhere near exhaustive. Every claim it makes is scoped accordingly.
 
 ### The bound, and what it lets us say
 

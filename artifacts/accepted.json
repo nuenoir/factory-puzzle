@@ -1,1 +1,169 @@
-[]
+[
+  {
+    "id": "gen-1",
+    "grid": {
+      "width": 7,
+      "height": 7
+    },
+    "sources": [
+      {
+        "pos": [
+          0,
+          3
+        ],
+        "rotation": 0,
+        "emits": "plate"
+      }
+    ],
+    "sinks": [
+      {
+        "pos": [
+          6,
+          3
+        ],
+        "rotation": 0
+      }
+    ],
+    "target": {
+      "type": "widget",
+      "count": 5
+    },
+    "max_ticks": 300,
+    "available": [
+      "conveyor",
+      "press",
+      "assembler",
+      "splitter",
+      "merger"
+    ],
+    "recipes": {
+      "press": {
+        "plate": "ingot"
+      },
+      "assembler": [
+        {
+          "in": [
+            "ingot",
+            "ingot"
+          ],
+          "out": "widget"
+        }
+      ]
+    },
+    "par": 26
+  },
+  {
+    "id": "gen-20",
+    "grid": {
+      "width": 7,
+      "height": 7
+    },
+    "sources": [
+      {
+        "pos": [
+          0,
+          1
+        ],
+        "rotation": 0,
+        "emits": "gadget"
+      }
+    ],
+    "sinks": [
+      {
+        "pos": [
+          6,
+          6
+        ],
+        "rotation": 0
+      }
+    ],
+    "target": {
+      "type": "ore",
+      "count": 5
+    },
+    "max_ticks": 300,
+    "available": [
+      "conveyor",
+      "press",
+      "assembler",
+      "splitter",
+      "merger"
+    ],
+    "recipes": {
+      "press": {
+        "gadget": "cog"
+      },
+      "assembler": [
+        {
+          "in": [
+            "cog",
+            "cog"
+          ],
+          "out": "ore"
+        }
+      ]
+    },
+    "par": 24
+  },
+  {
+    "id": "gen-25",
+    "grid": {
+      "width": 6,
+      "height": 6
+    },
+    "sources": [
+      {
+        "pos": [
+          0,
+          1
+        ],
+        "rotation": 0,
+        "emits": "gadget"
+      },
+      {
+        "pos": [
+          0,
+          4
+        ],
+        "rotation": 0,
+        "emits": "ore"
+      }
+    ],
+    "sinks": [
+      {
+        "pos": [
+          5,
+          5
+        ],
+        "rotation": 0
+      }
+    ],
+    "target": {
+      "type": "widget",
+      "count": 5
+    },
+    "max_ticks": 300,
+    "available": [
+      "conveyor",
+      "press",
+      "assembler",
+      "splitter"
+    ],
+    "recipes": {
+      "press": {
+        "gadget": "plate",
+        "ore": "ingot"
+      },
+      "assembler": [
+        {
+          "in": [
+            "plate",
+            "plate"
+          ],
+          "out": "widget"
+        }
+      ]
+    },
+    "par": 23
+  }
+]

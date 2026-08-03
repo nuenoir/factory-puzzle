@@ -21,8 +21,11 @@ export type ProducerType = 'press' | 'assembler'
  */
 export function reachableTypes(level: Level): Set<ItemType> {
   const reachable = new Set<ItemType>(level.sources.map((s) => s.emits))
-  const press = level.recipes.press ?? {}
-  const assemblers = level.recipes.assembler ?? []
+  // A recipe the level does not offer the machine for is not a route to
+  // anything. Gating here keeps stage A's "provably unsolvable" honest, and
+  // catches for free what would otherwise cost a whole bounded search.
+  const press = level.available.includes('press') ? (level.recipes.press ?? {}) : {}
+  const assemblers = level.available.includes('assembler') ? (level.recipes.assembler ?? []) : []
 
   for (let grew = true; grew; ) {
     grew = false
@@ -74,8 +77,8 @@ export interface MachineFloor {
  * can fan one press's output into both assembler ports.
  */
 export function machineFloor(level: Level): MachineFloor | null {
-  const press = level.recipes.press ?? {}
-  const assemblers = level.recipes.assembler ?? []
+  const press = level.available.includes('press') ? (level.recipes.press ?? {}) : {}
+  const assemblers = level.available.includes('assembler') ? (level.recipes.assembler ?? []) : []
   const sourceTypes = new Set<ItemType>(level.sources.map((s) => s.emits))
 
   const costOf = (machines: ReadonlyMap<ItemType, ProducerType>): number =>
