@@ -19,6 +19,7 @@ import type { BuildingSnapshot, Direction, ItemType, Snapshot } from '@factory/s
 import {
   deliveriesBetween,
   deriveTransits,
+  ease,
   jobProgress,
   lerpPoint,
   pulseGeometry,
@@ -38,6 +39,7 @@ import {
   hexAt,
   hexHeight,
   itemColor,
+  shade,
 } from '../theme'
 
 export type PointerPhase = 'down' | 'move' | 'up'
@@ -54,9 +56,20 @@ interface GridProps {
   readonly progress?: number
   /** Machine duration, for the job rings. */
   readonly duration?: number
+  /** The cell under the pointer, lifted so the board can answer the touch. */
+  readonly active?: readonly [number, number] | null
 }
 
-export function Grid({ snapshot, width, height, onCell, previous = null, progress = 1, duration = 2 }: GridProps) {
+export function Grid({
+  snapshot,
+  width,
+  height,
+  onCell,
+  previous = null,
+  progress = 1,
+  duration = 2,
+  active = null,
+}: GridProps) {
   const { width: windowWidth } = useWindowDimensions()
   const w = cellSizeFor(Math.min(windowWidth - 24, 520), width)
   const board = boardSize(w, width, height)
@@ -108,7 +121,15 @@ export function Grid({ snapshot, width, height, onCell, previous = null, progres
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       cells.push(
-        <Cell key={`${x},${y}`} x={x} y={y} w={w} building={byCell.get(`${x},${y}`)} duration={duration} />,
+        <Cell
+          key={`${x},${y}`}
+          x={x}
+          y={y}
+          w={w}
+          building={byCell.get(`${x},${y}`)}
+          duration={duration}
+          active={active !== null && active[0] === x && active[1] === y}
+        />,
       )
     }
   }
@@ -191,7 +212,15 @@ function TravellingItem({ transit, w, progress }: { transit: Transit; w: number;
   const start = transit.from === null ? anchor : transit.from
   const end = transit.to === null ? anchor : transit.to
 
-  const { x, y } = lerpPoint(anchorPoint(start, w), anchorPoint(end, w), t)
+  const a = anchorPoint(start, w)
+  const b = anchorPoint(end, w)
+  const { x, y } = lerpPoint(a, b, t)
+
+  // Roll while travelling, like an atom being carried along. Proportional to
+  // the distance covered, so a short hop turns less than a long one and a
+  // stationary item does not spin on the spot.
+  const travelled = Math.hypot(b.x - a.x, b.y - a.y)
+  const spin = travelled > 1 ? ease(t) * (travelled / w) * 180 : 0
 
   const scale = transit.from === null ? t : transit.to === null ? 1 - t : 1
   const drawn = Math.max(2, Math.round(size * scale))
@@ -205,7 +234,7 @@ function TravellingItem({ transit, w, progress }: { transit: Transit; w: number;
         opacity: transit.to === null ? 1 - t : 1,
       }}
     >
-      <Item type={transit.type} size={drawn} />
+      <Item type={transit.type} size={drawn} spin={spin} />
     </View>
   )
 }
@@ -216,23 +245,40 @@ interface CellProps {
   readonly w: number
   readonly building: BuildingSnapshot | undefined
   readonly duration: number
+  readonly active: boolean
 }
 
-function Cell({ x, y, w, building, duration }: CellProps) {
+function Cell({ x, y, w, building, duration, active }: CellProps) {
   const h = hexHeight(w)
   const { left, top } = cellOrigin(x, y, w)
   const style = building ? buildingStyles[building.type] : null
-  const fill = style ? style.fill : colors.emptyCell
   const edge = style ? style.accent : colors.cellEdge
 
+  // A machine mid-job glows, so a working line is legible at a glance and a
+  // stalled one stands out beside it.
+  const busy = building?.job != null
+  const fill = style ? (busy ? shade(style.fill, 0.14) : style.fill) : colors.emptyCell
+
   const portSize = Math.max(5, Math.round(w * 0.15))
-  const itemSize = Math.round(w * 0.36)
-  const bufferSize = Math.round(w * 0.26)
 
   return (
-    <View testID={`cell-${x}-${y}`} style={[styles.cell, { left: left + GAP, top: top + GAP, width: w, height: h }]}>
+    <View
+      testID={`cell-${x}-${y}`}
+      style={[
+        styles.cell,
+        {
+          left: left + GAP,
+          top: top + GAP,
+          width: w,
+          height: h,
+          // Lift the cell under the finger, so the board answers the touch.
+          transform: active ? [{ scale: 1.09 }] : undefined,
+          zIndex: active ? 2 : 0,
+        },
+      ]}
+    >
       {/* Outline hexagon behind a slightly smaller fill hexagon. */}
-      <Hexagon w={w} h={h} fill={edge + (building ? '77' : '')} />
+      <Hexagon w={w} h={h} fill={active ? colors.text : edge + (building ? '77' : '')} lit={false} />
       <View style={[styles.inset, { left: 1.5, top: 1.5 }]}>
         <Hexagon w={w - 3} h={h - 3} fill={fill} />
       </View>
@@ -270,8 +316,16 @@ function Cell({ x, y, w, building, duration }: CellProps) {
   )
 }
 
-/** A pointy-top hexagon: triangle, rectangle, triangle. */
-function Hexagon({ w, h, fill }: { w: number; h: number; fill: string }) {
+/**
+ * A pointy-top hexagon: triangle, rectangle, triangle.
+ *
+ * The three pieces are shaded separately — lighter cap, plain middle, darker
+ * base — so the cell reads as a solid object lit from above instead of a flat
+ * patch of colour. It costs nothing: the geometry was already in three parts.
+ */
+function Hexagon({ w, h, fill, lit = true }: { w: number; h: number; fill: string; lit?: boolean }) {
+  const cap = lit ? shade(fill, 0.16) : fill
+  const base = lit ? shade(fill, -0.22) : fill
   return (
     <View style={{ width: w, height: h }}>
       <View
@@ -283,7 +337,7 @@ function Hexagon({ w, h, fill }: { w: number; h: number; fill: string }) {
           borderBottomWidth: h / 4,
           borderLeftColor: 'transparent',
           borderRightColor: 'transparent',
-          borderBottomColor: fill,
+          borderBottomColor: cap,
         }}
       />
       <View style={{ width: w, height: h / 2, backgroundColor: fill }} />
@@ -296,7 +350,7 @@ function Hexagon({ w, h, fill }: { w: number; h: number; fill: string }) {
           borderTopWidth: h / 4,
           borderLeftColor: 'transparent',
           borderRightColor: 'transparent',
-          borderTopColor: fill,
+          borderTopColor: base,
         }}
       />
     </View>
@@ -369,19 +423,43 @@ function JobRing({ progress, w, h, accent }: { progress: number; w: number; h: n
   )
 }
 
-function Item({ type, size }: { type: ItemType; size: number }) {
+/**
+ * An item, drawn as a little sphere rather than a flat disc: darker rim, a
+ * specular highlight up and to the left, and a shadow beneath so it reads as
+ * sitting *on* the board rather than printed into it. Same light direction as
+ * the cells, which is what makes the two look like one scene.
+ */
+function Item({ type, size, spin = 0 }: { type: ItemType; size: number; spin?: number }) {
+  const base = itemColor(type)
+  const gloss = Math.round(size * 0.38)
+
   return (
     <View
       style={{
         width: size,
         height: size,
         borderRadius: size / 2,
-        backgroundColor: itemColor(type),
+        backgroundColor: base,
+        borderWidth: Math.max(1, Math.round(size * 0.07)),
+        borderColor: shade(base, -0.4),
         alignItems: 'center',
         justifyContent: 'center',
+        boxShadow: `0px ${Math.max(1, Math.round(size * 0.09))}px ${Math.round(size * 0.18)}px rgba(0,0,0,0.45)`,
+        transform: [{ rotate: `${spin}deg` }],
       }}
     >
-      <Text style={{ color: '#0d0f14', fontWeight: '800', fontSize: Math.max(7, size * 0.55) }}>
+      <View
+        style={{
+          position: 'absolute',
+          top: size * 0.12,
+          left: size * 0.14,
+          width: gloss,
+          height: gloss * 0.72,
+          borderRadius: gloss,
+          backgroundColor: 'rgba(255,255,255,0.5)',
+        }}
+      />
+      <Text style={{ color: shade(base, -0.62), fontWeight: '800', fontSize: Math.max(7, size * 0.5) }}>
         {type.charAt(0).toUpperCase()}
       </Text>
     </View>
@@ -389,7 +467,15 @@ function Item({ type, size }: { type: ItemType; size: number }) {
 }
 
 const styles = StyleSheet.create({
-  board: { backgroundColor: colors.board, borderRadius: 10, position: 'relative' },
+  board: {
+    backgroundColor: colors.board,
+    borderRadius: 10,
+    position: 'relative',
+    // The board sits in a shallow well, so the pieces on it read as raised.
+    borderWidth: 1,
+    borderColor: '#05070b',
+    boxShadow: 'inset 0px 2px 10px rgba(0,0,0,0.55)',
+  },
   cell: { position: 'absolute' },
   inset: { position: 'absolute' },
   centre: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },

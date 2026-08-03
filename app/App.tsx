@@ -69,6 +69,8 @@ export default function App() {
 
   const worldRef = useRef<World | null>(null)
   const drag = useRef<{ path: PosTuple[]; anchor: PosTuple | null; terminus: PosTuple | null } | null>(null)
+  /** The cell under the finger, so the board can respond to being touched. */
+  const [activeCell, setActiveCell] = useState<PosTuple | null>(null)
 
   const solution = useMemo(() => ({ level_id: level.id, placements }), [placements])
   const cost = useMemo(() => costOf(solution), [solution])
@@ -160,9 +162,11 @@ export default function App() {
     (phase: PointerPhase, x: number, y: number) => {
       if (phase === 'up') {
         drag.current = null
+        setActiveCell(null)
         return
       }
       const pos: PosTuple = [x, y]
+      setActiveCell(pos)
       if (fixtureCells.has(`${x},${y}`)) return
 
       if (tool === 'delete') {
@@ -250,6 +254,7 @@ export default function App() {
           width={level.grid.width}
           height={level.grid.height}
           onCell={handleCell}
+          active={activeCell}
         />
       ) : (
         <View style={styles.errorBox}>

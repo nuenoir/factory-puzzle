@@ -107,6 +107,24 @@ export const buildingStyles: Readonly<Record<BuildingType, BuildingStyle>> = {
   merger: { fill: '#13303a', accent: '#22d3ee', label: 'MERGE' },
 }
 
+/**
+ * Lighten or darken a `#rrggbb` colour. `amount` runs -1 (black) to 1 (white).
+ *
+ * Everything on the board is lit from above: a face gets a lighter top and a
+ * darker underside, which is most of what stops a flat fill reading as a
+ * sticker. Cheaper and more controllable than shipping a gradient library.
+ */
+export function shade(hex: string, amount: number): string {
+  const value = hex.replace('#', '')
+  const full = value.length === 3 ? value.split('').map((c) => c + c).join('') : value
+  const channels = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16))
+  const mixed = channels.map((c) => {
+    const target = amount >= 0 ? 255 : 0
+    return Math.round(c + (target - c) * Math.abs(amount))
+  })
+  return `#${mixed.map((c) => c.toString(16).padStart(2, '0')).join('')}`
+}
+
 const itemPalette = ['#f87171', '#fbbf24', '#4ade80', '#60a5fa', '#c084fc', '#f472b6', '#fb923c']
 
 /**
