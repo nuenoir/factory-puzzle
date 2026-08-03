@@ -117,6 +117,21 @@ export function Grid({
   const byCell = new Map<string, BuildingSnapshot>()
   for (const b of snapshot.buildings) byCell.set(`${b.x},${b.y}`, b)
 
+  // Items live in their own layer above the board so they can travel between
+  // cells instead of being clipped inside one.
+  const transits = deriveTransits(previous, snapshot)
+  const deliveries = deliveriesBetween(previous, snapshot)
+
+  // Belts carrying an item that did not move are blocked, and their chevrons
+  // stop. Flowing chevrons on a deadlocked line would be the same lie the
+  // item tween is careful not to tell.
+  const blocked = new Set<string>()
+  for (const t of transits) {
+    if (t.from === null || t.to === null) continue
+    if (t.from.dir !== undefined || t.to.dir !== undefined) continue
+    if (t.from.x === t.to.x && t.from.y === t.to.y) blocked.add(`${t.from.x},${t.from.y}`)
+  }
+
   const cells = []
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -129,15 +144,11 @@ export function Grid({
           building={byCell.get(`${x},${y}`)}
           duration={duration}
           active={active !== null && active[0] === x && active[1] === y}
+          flow={blocked.has(`${x},${y}`) ? null : snapshot.tick + progress}
         />,
       )
     }
   }
-
-  // Items live in their own layer above the board so they can travel between
-  // cells instead of being clipped inside one.
-  const transits = deriveTransits(previous, snapshot)
-  const deliveries = deliveriesBetween(previous, snapshot)
 
   return (
     <View
@@ -246,9 +257,11 @@ interface CellProps {
   readonly building: BuildingSnapshot | undefined
   readonly duration: number
   readonly active: boolean
+  /** Continuously rising phase for the belt chevrons, or null when blocked. */
+  readonly flow: number | null
 }
 
-function Cell({ x, y, w, building, duration, active }: CellProps) {
+function Cell({ x, y, w, building, duration, active, flow }: CellProps) {
   const h = hexHeight(w)
   const { left, top } = cellOrigin(x, y, w)
   const style = building ? buildingStyles[building.type] : null
@@ -293,9 +306,20 @@ function Cell({ x, y, w, building, duration, active }: CellProps) {
             <Dot key={`out-${d}`} d={d} w={w} h={h} size={portSize} color={edge} />
           ))}
 
+          {building.type === 'conveyor' ? (
+            <BeltFlow
+              w={w}
+              h={h}
+              inDir={building.inPorts[0] as Direction}
+              outDir={building.outPorts[0] as Direction}
+              accent={edge}
+              phase={flow}
+            />
+          ) : null}
+
           <View style={styles.centre}>
             {building.type === 'conveyor' ? (
-              <Text style={{ color: edge, opacity: 0.55, fontSize: Math.round(w * 0.3), fontWeight: '700' }}>
+              <Text style={{ color: edge, opacity: 0.28, fontSize: Math.round(w * 0.26), fontWeight: '700' }}>
                 {arrow[building.outPorts[0] as Direction]}
               </Text>
             ) : (
@@ -384,6 +408,83 @@ function Dot({ d, w, h, size, color }: { d: Direction; w: number; h: number; siz
         backgroundColor: color,
       }}
     />
+  )
+}
+
+const CHEVRONS = 3
+
+/**
+ * Arrows drifting along a belt from its input edge to its output edge.
+ *
+ * They give the board motion even where no item happens to be passing, which
+ * is most of it. One traversal per tick, so they run at exactly the speed an
+ * item does — chevrons faster than the cargo would read as a different machine
+ * entirely.
+ *
+ * `phase` is null when the belt is blocked, and then they stop and dim. A
+ * deadlocked line has to look deadlocked (§8); flowing arrows over a jam would
+ * undo the care taken everywhere else not to animate a lie.
+ */
+function BeltFlow({
+  w,
+  h,
+  inDir,
+  outDir,
+  accent,
+  phase,
+}: {
+  w: number
+  h: number
+  inDir: Direction
+  outDir: Direction
+  accent: string
+  phase: number | null
+}) {
+  if (inDir === undefined || outDir === undefined) return null
+
+  const from = edgeCentre(inDir, w, h)
+  const to = edgeCentre(outDir, w, h)
+  // A border-trick triangle points up, so turn it to face the way out.
+  const angle = (Math.atan2(to.y - h / 2, to.x - w / 2) * 180) / Math.PI + 90
+  const size = Math.max(3, Math.round(w * 0.13))
+
+  return (
+    <>
+      {Array.from({ length: CHEVRONS }, (_, i) => {
+        const offset = i / CHEVRONS
+        const u = phase === null ? offset : (((phase + offset) % 1) + 1) % 1
+        const x = from.x + (to.x - from.x) * u
+        const y = from.y + (to.y - from.y) * u
+        // Fade in and out at the ends so nothing pops at the cell boundary.
+        const opacity = (phase === null ? 0.16 : 0.5) * Math.sin(u * Math.PI)
+
+        return (
+          <View
+            key={i}
+            style={{
+              position: 'absolute',
+              left: x - size / 2,
+              top: y - size / 2,
+              opacity,
+              transform: [{ rotate: `${angle}deg` }],
+            }}
+          >
+            <View
+              style={{
+                width: 0,
+                height: 0,
+                borderLeftWidth: size / 2,
+                borderRightWidth: size / 2,
+                borderBottomWidth: size * 0.85,
+                borderLeftColor: 'transparent',
+                borderRightColor: 'transparent',
+                borderBottomColor: accent,
+              }}
+            />
+          </View>
+        )
+      })}
+    </>
   )
 }
 
