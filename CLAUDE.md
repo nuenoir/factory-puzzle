@@ -61,7 +61,7 @@ Explicitly **not** in scope yet, do not build these even if they seem quick:
 
 - Daily rotation, sharing, streaks (Phase 4)
 - Store assets, analytics, accounts
-- More UI polish. Phase 2 shipped; leave it alone unless a generated level exposes a real bug.
+**Animation is in scope again** (reopened deliberately: the board read as dead, items teleported between ticks). It is **presentation only**. The simulator stays discrete and authoritative; the renderer interpolates between two consecutive snapshots. Never animate a guess, never let a tween decide anything the engine did not — what you watch must remain exactly what got scored.
 
 **Phases 1 and 2 are done.** `packages/sim/` passes all twelve §14 cases plus a `spec-invariants` suite, verified falsifiable by mutation testing. Treat it as settled: if generation wants a behaviour change, that is a spec change first (§15, then tests, then code) — not an edit to the simulator to make a search terminate.
 

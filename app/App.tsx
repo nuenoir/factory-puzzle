@@ -35,7 +35,13 @@ import { colors } from './theme'
 
 type Status = 'idle' | 'running' | 'won' | 'jammed' | 'timeout'
 
-const TICK_MS = 300
+/** Milliseconds per tick at each speed. The tween fills exactly this long. */
+const SPEEDS = [
+  { label: '0.5×', ms: 600 },
+  { label: '1×', ms: 300 },
+  { label: '2×', ms: 150 },
+  { label: '4×', ms: 75 },
+] as const
 
 /** Sources and sinks are fixed by the level and not placeable (§4). */
 const fixtureCells = new Set(
@@ -48,9 +54,18 @@ export default function App() {
   const [rotation, setRotation] = useState<Rotation>(0)
 
   const [snap, setSnap] = useState<Snapshot | null>(null)
+  const [previous, setPrevious] = useState<Snapshot | null>(null)
   const [status, setStatus] = useState<Status>('idle')
   const [playing, setPlaying] = useState(false)
   const [errors, setErrors] = useState<readonly string[]>([])
+  const [speed, setSpeed] = useState(1)
+
+  // Progress through the current tick, 0 to 1. The simulation is discrete;
+  // this only decides where an item is drawn between two snapshots.
+  const [progress, setProgress] = useState(1)
+  const tickStartedAt = useRef(0)
+  const [epoch, setEpoch] = useState(0)
+  const tickMs = SPEEDS[speed].ms
 
   const worldRef = useRef<World | null>(null)
   const drag = useRef<{ path: PosTuple[]; anchor: PosTuple | null; terminus: PosTuple | null } | null>(null)
@@ -73,6 +88,8 @@ export default function App() {
     setErrors([])
     worldRef.current = built.world
     setSnap(snapshot(built.world))
+    setPrevious(null)
+    setProgress(1)
   }, [solution])
 
   useEffect(rebuild, [rebuild])
@@ -82,8 +99,14 @@ export default function App() {
     if (!world) return
 
     const before = stateKey(world)
+    const wasShowing = snapshot(world)
     step(world)
+    setPrevious(wasShowing)
     setSnap(snapshot(world))
+    // Restart the tween from the top of this tick.
+    tickStartedAt.current = Date.now()
+    setProgress(0)
+    setEpoch((e) => e + 1)
 
     // §10: win is checked first, then the tick limit.
     if ((world.delivered.get(level.target.type) ?? 0) >= level.target.count) {
@@ -103,9 +126,31 @@ export default function App() {
 
   useEffect(() => {
     if (!playing) return
-    const id = setInterval(advance, TICK_MS)
+    const id = setInterval(advance, tickMs)
     return () => clearInterval(id)
-  }, [playing, advance])
+  }, [playing, advance, tickMs])
+
+  /**
+   * Drive the tween. One frame loop per tick, stopping when it lands — an
+   * idle board should not be re-rendering sixty times a second.
+   */
+  useEffect(() => {
+    if (progress >= 1) return
+    let frame = 0
+    let cancelled = false
+    const run = () => {
+      if (cancelled) return
+      const elapsed = Date.now() - tickStartedAt.current
+      const next = Math.min(1, tickMs <= 0 ? 1 : elapsed / tickMs)
+      setProgress(next)
+      if (next < 1) frame = requestAnimationFrame(run)
+    }
+    frame = requestAnimationFrame(run)
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(frame)
+    }
+  }, [epoch, tickMs, progress >= 1])
 
   const handleCell = useCallback(
     (phase: PointerPhase, x: number, y: number) => {
@@ -193,7 +238,15 @@ export default function App() {
       </View>
 
       {snap ? (
-        <Grid snapshot={snap} width={level.grid.width} height={level.grid.height} onCell={handleCell} />
+        <Grid
+          snapshot={snap}
+          previous={previous}
+          progress={progress}
+          duration={level.durations?.press ?? 2}
+          width={level.grid.width}
+          height={level.grid.height}
+          onCell={handleCell}
+        />
       ) : (
         <View style={styles.errorBox}>
           <Text style={styles.errorTitle}>This layout is not valid</Text>
@@ -229,6 +282,24 @@ export default function App() {
         <Button label="Step" onPress={advance} disabled={!runnable || playing || finished} />
         <Button label="Reset" onPress={rebuild} disabled={!runnable} />
         <Button label="Clear" onPress={() => dispatch({ kind: 'clear' })} disabled={placements.length === 0} />
+      </View>
+
+      <View style={styles.speedRow}>
+        <Text style={styles.speedLabel}>Speed</Text>
+        {SPEEDS.map((option, index) => (
+          <Pressable
+            key={option.label}
+            testID={`speed-${index}`}
+            onPress={() => setSpeed(index)}
+            style={({ pressed }) => [
+              styles.speed,
+              index === speed && styles.speedOn,
+              pressed && styles.buttonPressed,
+            ]}
+          >
+            <Text style={[styles.speedText, index === speed && styles.speedTextOn]}>{option.label}</Text>
+          </Pressable>
+        ))}
       </View>
 
       <Text style={[styles.status, statusTone(status)]}>{statusText(status, snap?.tick ?? 0, placements.length)}</Text>
@@ -329,4 +400,17 @@ const styles = StyleSheet.create({
   buttonLabelPrimary: { color: '#cfe0ff' },
   buttonLabelDisabled: { color: colors.faint },
   status: { marginTop: 12, fontSize: 13, textAlign: 'center' },
+  speedRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+  speedLabel: { color: colors.faint, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, marginRight: 2 },
+  speed: {
+    borderWidth: 1,
+    borderColor: colors.panelEdge,
+    backgroundColor: colors.panel,
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+  },
+  speedOn: { borderColor: '#3d4a6e', backgroundColor: '#2b3550' },
+  speedText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
+  speedTextOn: { color: '#cfe0ff' },
 })

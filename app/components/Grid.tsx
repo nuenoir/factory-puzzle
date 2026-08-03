@@ -16,6 +16,8 @@ import { PanResponder, StyleSheet, Text, View, useWindowDimensions } from 'react
 import type { GestureResponderEvent } from 'react-native'
 import type { BuildingSnapshot, Direction, ItemType, Snapshot } from '@factory/sim'
 
+import { deriveTransits, jobProgress, type Anchor, type Transit } from '../motion'
+
 import {
   GAP,
   arrow,
@@ -37,9 +39,15 @@ interface GridProps {
   readonly height: number
   /** Called with the cell under the pointer. `up` carries the last cell again. */
   readonly onCell?: (phase: PointerPhase, x: number, y: number) => void
+  /** The tick before this one, so items can slide instead of teleporting. */
+  readonly previous?: Snapshot | null
+  /** How far through the tick the animation is, 0 to 1. */
+  readonly progress?: number
+  /** Machine duration, for the job rings. */
+  readonly duration?: number
 }
 
-export function Grid({ snapshot, width, height, onCell }: GridProps) {
+export function Grid({ snapshot, width, height, onCell, previous = null, progress = 1, duration = 2 }: GridProps) {
   const { width: windowWidth } = useWindowDimensions()
   const w = cellSizeFor(Math.min(windowWidth - 24, 520), width)
   const board = boardSize(w, width, height)
@@ -90,9 +98,15 @@ export function Grid({ snapshot, width, height, onCell }: GridProps) {
   const cells = []
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      cells.push(<Cell key={`${x},${y}`} x={x} y={y} w={w} building={byCell.get(`${x},${y}`)} />)
+      cells.push(
+        <Cell key={`${x},${y}`} x={x} y={y} w={w} building={byCell.get(`${x},${y}`)} duration={duration} />,
+      )
     }
   }
+
+  // Items live in their own layer above the board so they can travel between
+  // cells instead of being clipped inside one.
+  const transits = deriveTransits(previous, snapshot)
 
   return (
     <View
@@ -101,6 +115,56 @@ export function Grid({ snapshot, width, height, onCell }: GridProps) {
       {...(onCell ? responder.panHandlers : {})}
     >
       {cells}
+      {transits.map((transit) => (
+        <TravellingItem key={transit.key} transit={transit} w={w} progress={progress} />
+      ))}
+    </View>
+  )
+}
+
+/** Eases out, so an item settles into a cell rather than stopping dead. */
+function ease(t: number): number {
+  return 1 - (1 - t) * (1 - t)
+}
+
+/** Pixel position of an anchor: the middle of a cell, or just inside a port. */
+function anchorPoint(anchor: Anchor, w: number): { x: number; y: number } {
+  const h = hexHeight(w)
+  const { left, top } = cellOrigin(anchor.x, anchor.y, w)
+  if (anchor.dir === undefined) return { x: left + w / 2, y: top + h / 2 }
+  const edge = edgeCentre(anchor.dir, w, h)
+  return { x: left + edge.x + (w / 2 - edge.x) * 0.5, y: top + edge.y + (h / 2 - edge.y) * 0.5 }
+}
+
+function TravellingItem({ transit, w, progress }: { transit: Transit; w: number; progress: number }) {
+  const size = Math.round(w * (transit.from === null || transit.to === null ? 0.3 : 0.36))
+  const t = ease(Math.min(1, Math.max(0, progress)))
+
+  // A brand-new item grows into place; a consumed one shrinks away. Anything
+  // that merely moved slides between the two anchors.
+  const anchor = transit.to ?? transit.from
+  if (anchor === undefined || anchor === null) return null
+  const start = transit.from === null ? anchor : transit.from
+  const end = transit.to === null ? anchor : transit.to
+
+  const a = anchorPoint(start, w)
+  const b = anchorPoint(end, w)
+  const x = a.x + (b.x - a.x) * t
+  const y = a.y + (b.y - a.y) * t
+
+  const scale = transit.from === null ? t : transit.to === null ? 1 - t : 1
+  const drawn = Math.max(2, Math.round(size * scale))
+
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        left: GAP + x - drawn / 2,
+        top: GAP + y - drawn / 2,
+        opacity: transit.to === null ? 1 - t : 1,
+      }}
+    >
+      <Item type={transit.type} size={drawn} />
     </View>
   )
 }
@@ -110,9 +174,10 @@ interface CellProps {
   readonly y: number
   readonly w: number
   readonly building: BuildingSnapshot | undefined
+  readonly duration: number
 }
 
-function Cell({ x, y, w, building }: CellProps) {
+function Cell({ x, y, w, building, duration }: CellProps) {
   const h = hexHeight(w)
   const { left, top } = cellOrigin(x, y, w)
   const style = building ? buildingStyles[building.type] : null
@@ -153,28 +218,10 @@ function Cell({ x, y, w, building }: CellProps) {
             )}
           </View>
 
-          {/* A conveyor holds its item in the cell itself (§5). */}
-          {building.type === 'conveyor' && building.item !== null ? (
-            <View style={[styles.centre]}>
-              <Item type={building.item} size={itemSize} />
-            </View>
-          ) : null}
-
-          {/* Machines and sinks hold items in capacity-1 buffers, drawn just
-              inside the port they arrived through so queues stay visible. */}
-          {Object.entries(building.inputs).map(([dir, item]) =>
-            item === null ? null : (
-              <Buffered key={`buf-${dir}`} d={dir as Direction} w={w} h={h} size={bufferSize} type={item} />
-            ),
-          )}
-          {building.output !== null && building.outPorts.length > 0 ? (
-            <Buffered d={building.outPorts[0] as Direction} w={w} h={h} size={bufferSize} type={building.output} />
-          ) : null}
-
-          {building.job !== null ? (
-            <Text style={[styles.job, { color: building.job.timer > 0 ? colors.muted : colors.warn }]}>
-              {building.job.timer > 0 ? building.job.timer : '!'}
-            </Text>
+          {/* Items are drawn in a layer above the board so they can travel
+              between cells; only the job indicator lives in the cell. */}
+          {progressOf(building, duration) !== null ? (
+            <JobRing progress={progressOf(building, duration) as number} w={w} h={h} accent={edge} />
           ) : null}
         </>
       ) : null}
@@ -245,14 +292,38 @@ function Dot({ d, w, h, size, color }: { d: Direction; w: number; h: number; siz
   )
 }
 
-/** A buffered item, pulled in from its port towards the middle of the cell. */
-function Buffered({ d, w, h, size, type }: { d: Direction; w: number; h: number; size: number; type: ItemType }) {
-  const c = edgeCentre(d, w, h)
-  const x = c.x + (w / 2 - c.x) * 0.5
-  const y = c.y + (h / 2 - c.y) * 0.5
+const progressOf = jobProgress
+
+/**
+ * A bar across the bottom of a machine showing how far its job has run.
+ *
+ * A finished job whose output is blocked rests at full and turns amber: §8
+ * wants a stalled machine to be obvious, and that is the state a player has to
+ * spot to understand why the line stopped.
+ */
+function JobRing({ progress, w, h, accent }: { progress: number; w: number; h: number; accent: string }) {
+  const full = progress >= 1
+  const width = Math.max(2, Math.round(w * 0.5))
   return (
-    <View style={{ position: 'absolute', left: x - size / 2, top: y - size / 2 }}>
-      <Item type={type} size={size} />
+    <View
+      style={{
+        position: 'absolute',
+        left: (w - width) / 2,
+        top: h * 0.72,
+        width,
+        height: 3,
+        borderRadius: 2,
+        backgroundColor: '#00000055',
+        overflow: 'hidden',
+      }}
+    >
+      <View
+        style={{
+          width: `${Math.round(progress * 100)}%`,
+          height: '100%',
+          backgroundColor: full ? colors.warn : accent,
+        }}
+      />
     </View>
   )
 }
