@@ -16,7 +16,16 @@ import { PanResponder, StyleSheet, Text, View, useWindowDimensions } from 'react
 import type { GestureResponderEvent } from 'react-native'
 import type { BuildingSnapshot, Direction, ItemType, Snapshot } from '@factory/sim'
 
-import { deriveTransits, jobProgress, type Anchor, type Transit } from '../motion'
+import {
+  deliveriesBetween,
+  deriveTransits,
+  jobProgress,
+  lerpPoint,
+  pulseGeometry,
+  type Anchor,
+  type Delivery,
+  type Transit,
+} from '../motion'
 
 import {
   GAP,
@@ -107,6 +116,7 @@ export function Grid({ snapshot, width, height, onCell, previous = null, progres
   // Items live in their own layer above the board so they can travel between
   // cells instead of being clipped inside one.
   const transits = deriveTransits(previous, snapshot)
+  const deliveries = deliveriesBetween(previous, snapshot)
 
   return (
     <View
@@ -115,6 +125,9 @@ export function Grid({ snapshot, width, height, onCell, previous = null, progres
       {...(onCell ? responder.panHandlers : {})}
     >
       {cells}
+      {deliveries.map((delivery) => (
+        <DeliveryPulse key={delivery.key} delivery={delivery} w={w} progress={progress} />
+      ))}
       {transits.map((transit) => (
         <TravellingItem key={transit.key} transit={transit} w={w} progress={progress} />
       ))}
@@ -122,9 +135,38 @@ export function Grid({ snapshot, width, height, onCell, previous = null, progres
   )
 }
 
-/** Eases out, so an item settles into a cell rather than stopping dead. */
-function ease(t: number): number {
-  return 1 - (1 - t) * (1 - t)
+/**
+ * A ring expanding out of a sink as something lands in it.
+ *
+ * Worth having because it is the one moment the item tween cannot show: a sink
+ * being fed every tick has its buffer emptied and refilled together, so
+ * occupancy never changes and a steady stream looks like a stationary item.
+ * The pulse comes from the engine's own phase-1 consumption, not from
+ * comparing pixels.
+ */
+function DeliveryPulse({ delivery, w, progress }: { delivery: Delivery; w: number; progress: number }) {
+  const t = Math.min(1, Math.max(0, progress))
+  if (t >= 1) return null
+
+  const h = hexHeight(w)
+  const { left, top } = cellOrigin(delivery.at.x, delivery.at.y, w)
+  const { size, opacity } = pulseGeometry(w, t)
+
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        left: GAP + left + w / 2 - size / 2,
+        top: GAP + top + h / 2 - size / 2,
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        borderWidth: Math.max(1, Math.round(w * 0.045)),
+        borderColor: itemColor(delivery.type),
+        opacity,
+      }}
+    />
+  )
 }
 
 /** Pixel position of an anchor: the middle of a cell, or just inside a port. */
@@ -137,8 +179,10 @@ function anchorPoint(anchor: Anchor, w: number): { x: number; y: number } {
 }
 
 function TravellingItem({ transit, w, progress }: { transit: Transit; w: number; progress: number }) {
-  const size = Math.round(w * (transit.from === null || transit.to === null ? 0.3 : 0.36))
-  const t = ease(Math.min(1, Math.max(0, progress)))
+  // One base size for every item: an arriving one grows into it and a consumed
+  // one shrinks out of it, so nothing changes size the tick after it settles.
+  const size = Math.round(w * 0.36)
+  const t = Math.min(1, Math.max(0, progress))
 
   // A brand-new item grows into place; a consumed one shrinks away. Anything
   // that merely moved slides between the two anchors.
@@ -147,10 +191,7 @@ function TravellingItem({ transit, w, progress }: { transit: Transit; w: number;
   const start = transit.from === null ? anchor : transit.from
   const end = transit.to === null ? anchor : transit.to
 
-  const a = anchorPoint(start, w)
-  const b = anchorPoint(end, w)
-  const x = a.x + (b.x - a.x) * t
-  const y = a.y + (b.y - a.y) * t
+  const { x, y } = lerpPoint(anchorPoint(start, w), anchorPoint(end, w), t)
 
   const scale = transit.from === null ? t : transit.to === null ? 1 - t : 1
   const drawn = Math.max(2, Math.round(size * scale))

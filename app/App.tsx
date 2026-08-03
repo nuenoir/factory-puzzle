@@ -103,9 +103,13 @@ export default function App() {
     step(world)
     setPrevious(wasShowing)
     setSnap(snapshot(world))
-    // Restart the tween from the top of this tick.
+    // Restart the tween from the top of this tick. A hidden tab gets no
+    // animation frames at all, so tweening there would freeze items at their
+    // starting positions while the simulation ran on — showing a board a tick
+    // out of date. Snap straight to the truth instead.
+    const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden'
     tickStartedAt.current = Date.now()
-    setProgress(0)
+    setProgress(hidden ? 1 : 0)
     setEpoch((e) => e + 1)
 
     // §10: win is checked first, then the tick limit.

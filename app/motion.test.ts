@@ -11,7 +11,16 @@
 import { describe, expect, it } from 'vitest'
 import { createWorld, seedItems, snapshot, step, type Level, type Placement, type Snapshot } from '@factory/sim'
 
-import { deriveTransits, jobProgress, occupancyOf, slotKey } from './motion'
+import {
+  deliveriesBetween,
+  deriveTransits,
+  ease,
+  jobProgress,
+  lerpPoint,
+  occupancyOf,
+  pulseGeometry,
+  slotKey,
+} from './motion'
 
 function build(level: Level, placements: Placement[]) {
   const made = createWorld(level, { level_id: level.id, placements })
@@ -138,6 +147,120 @@ describe('items entering and leaving', () => {
     const transits = deriveTransits(null, snapshot(world))
     expect(transits).toHaveLength(1)
     expect(transits[0].from).toBeNull()
+  })
+})
+
+describe('a saturated line feeding a sink', () => {
+  it('keeps flowing, because the sink frees its buffer every tick', () => {
+    // The ordinary steady state: source emitting, every belt cell full, sink
+    // eating one per tick. Nothing ahead ever *looks* empty, so this is the
+    // case that renders frozen unless consumption counts as freeing a slot.
+    const level = baseLevel({
+      sources: [{ pos: [0, 3], rotation: 0, emits: 'circle' }],
+      sinks: [{ pos: [5, 3], rotation: 0 }],
+      target: { type: 'circle', count: 99 },
+    })
+    const world = build(level, belts(1, 3, 4))
+    for (let i = 0; i < 12; i += 1) step(world)
+
+    const before = snapshot(world)
+    step(world)
+    const transits = deriveTransits(before, snapshot(world))
+
+    // The two snapshots are occupancy-identical — every slot filled before is
+    // filled after — and yet every item on the line moved.
+    expect([...occupancyOf(before).keys()].sort()).toEqual([...occupancyOf(snapshot(world)).keys()].sort())
+    expect(transits.filter(moved).length).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('deliveriesBetween', () => {
+  const lineToSink = () => {
+    const level = baseLevel({
+      sources: [{ pos: [0, 3], rotation: 0, emits: 'circle' }],
+      sinks: [{ pos: [4, 3], rotation: 0 }],
+      target: { type: 'circle', count: 99 },
+    })
+    return build(level, belts(1, 3, 3))
+  }
+
+  it('reports nothing before anything has arrived', () => {
+    const world = lineToSink()
+    const before = snapshot(world)
+    step(world)
+    expect(deliveriesBetween(before, snapshot(world))).toEqual([])
+  })
+
+  it('reports a delivery at the sink that took it', () => {
+    const world = lineToSink()
+    // §14 case 1: the first item is counted on tick 4, so it sits in the sink
+    // buffer at the end of tick 3.
+    for (let i = 0; i < 3; i += 1) step(world)
+
+    const before = snapshot(world)
+    step(world)
+    const landed = deliveriesBetween(before, snapshot(world))
+
+    expect(landed).toHaveLength(1)
+    expect(landed[0].type).toBe('circle')
+    expect(landed[0].at).toEqual({ x: 4, y: 3 })
+  })
+
+  it('agrees with the engine own delivered counter, tick after tick', () => {
+    // The counter is the authority on how many landed; the buffers are the
+    // only thing that knows where. They must never disagree.
+    const world = lineToSink()
+    let before = snapshot(world)
+
+    for (let tick = 0; tick < 12; tick += 1) {
+      step(world)
+      const after = snapshot(world)
+      const counted = (after.delivered['circle'] ?? 0) - (before.delivered['circle'] ?? 0)
+      expect(deliveriesBetween(before, after)).toHaveLength(counted)
+      before = after
+    }
+  })
+
+  it('still fires while the sink is being refilled every tick', () => {
+    // The case the item tween cannot show: buffer emptied and refilled on the
+    // same tick, so occupancy never changes and nothing appears to happen.
+    const world = lineToSink()
+    for (let i = 0; i < 6; i += 1) step(world)
+
+    const before = snapshot(world)
+    step(world)
+    expect(before.buildings.find((b) => b.type === 'sink')?.inputs['W']).toBe('circle')
+    expect(deliveriesBetween(before, snapshot(world))).toHaveLength(1)
+  })
+})
+
+describe('the tween itself', () => {
+  it('starts at the source and lands exactly on the target', () => {
+    const a = { x: 10, y: 20 }
+    const b = { x: 110, y: 220 }
+    expect(lerpPoint(a, b, 0)).toEqual(a)
+    expect(lerpPoint(a, b, 1)).toEqual(b)
+  })
+
+  it('eases out, so it covers more ground early than late', () => {
+    const first = ease(0.25) - ease(0)
+    const last = ease(1) - ease(0.75)
+    expect(first).toBeGreaterThan(last)
+  })
+
+  it('never overshoots, whatever it is handed', () => {
+    for (const t of [-5, -0.1, 0, 0.5, 1, 1.4, 99]) {
+      expect(ease(t)).toBeGreaterThanOrEqual(0)
+      expect(ease(t)).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it('grows the delivery ring outward and fades it to nothing', () => {
+    const start = pulseGeometry(60, 0)
+    const end = pulseGeometry(60, 1)
+    expect(end.size).toBeGreaterThan(start.size)
+    expect(start.opacity).toBeGreaterThan(0)
+    expect(end.opacity).toBe(0)
   })
 })
 
