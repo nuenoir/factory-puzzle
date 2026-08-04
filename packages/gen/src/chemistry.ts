@@ -56,6 +56,72 @@ export function isProducible(level: Level): boolean {
   return reachableTypes(level).has(level.target.type)
 }
 
+/**
+ * §4 stage B. Can the target be built without ever fanning one output into two
+ * consumers? Only meaningful when the level offers no splitter — with one, a
+ * chain of them supplies any fan-out a plan asks for.
+ *
+ * Stage A asks only whether the target *type* is reachable, which ignores how
+ * many items a building can hand out at once. Every building in the palette has
+ * exactly one output port except the splitter (rules-spec §4), so without one
+ * the factory must be a strict tree, and each leaf of that tree has to be a
+ * *different* source — one source, one port, one consumer.
+ *
+ * So the question reduces to: is there a derivation of the target whose leaves
+ * are distinct sources? Track the set of source indices each derivation
+ * consumes as a bitmask; an assembler may combine two arms only when their
+ * masks are disjoint, because a shared source would have to feed both.
+ *
+ * Deliberately *not* depth-bounded. This answer is reported as a proof, and a
+ * depth limit would turn "we did not look far enough" into "impossible" — the
+ * exact conflation the whole rejection-code scheme exists to prevent. Refusing
+ * to revisit a type already on the current chain is what makes it terminate,
+ * and that is sound here: a derivation that loops back to a type it already
+ * made can always be cut short at the inner occurrence, which yields a *subset*
+ * of the leaves. Fewer leaves can only make repeat-freeness easier, so nothing
+ * feasible is ever hidden by the cut.
+ */
+export function deliverableWithoutFanout(level: Level): boolean {
+  const press = level.available.includes('press') ? (level.recipes.press ?? {}) : {}
+  const assemblers = level.available.includes('assembler') ? (level.recipes.assembler ?? []) : []
+
+  /** Source-index bitmasks reachable for `type` using each source at most once. */
+  const masksFor = (type: ItemType, chain: ReadonlySet<ItemType>): Set<number> => {
+    const masks = new Set<number>()
+    level.sources.forEach((source, index) => {
+      if (source.emits === type) masks.add(1 << index)
+    })
+    if (chain.has(type)) return masks
+
+    const deeper = new Set(chain).add(type)
+
+    for (const [input, output] of Object.entries(press)) {
+      if (output !== type) continue
+      // A press passes its arm's sources straight through — one in, one out.
+      for (const mask of masksFor(input, deeper)) masks.add(mask)
+    }
+
+    for (const recipe of assemblers) {
+      if (recipe.out !== type) continue
+      const [a, b] = recipe.in
+      const left = masksFor(a, deeper)
+      if (left.size === 0) continue
+      const right = masksFor(b, deeper)
+      for (const l of left) {
+        for (const r of right) {
+          // Overlapping masks mean one source would have to feed both arms,
+          // which is precisely the fan-out no splitter is available for.
+          if ((l & r) === 0) masks.add(l | r)
+        }
+      }
+    }
+
+    return masks
+  }
+
+  return masksFor(level.target.type, new Set()).size > 0
+}
+
 export interface MachineFloor {
   /** A lower bound on the cost of any solution. */
   readonly cost: number

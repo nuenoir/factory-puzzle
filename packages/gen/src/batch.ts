@@ -13,7 +13,14 @@
 import type { Level } from '@factory/sim'
 
 import { generateLevel, type GeneratorOptions, DEFAULT_GENERATOR_OPTIONS } from './generator.ts'
-import { validate, withComputedPar, type Criteria, type Verdict, DEFAULT_CRITERIA } from './validator.ts'
+import {
+  validate,
+  withComputedPar,
+  type Criteria,
+  type RejectionCode,
+  type Verdict,
+  DEFAULT_CRITERIA,
+} from './validator.ts'
 import { DEFAULT_SEARCH_LIMITS, type SearchLimits } from './solver.ts'
 
 export interface CandidateRecord {
@@ -91,16 +98,24 @@ export interface BatchSummary {
   readonly total: number
   readonly accepted: number
   /** Counts per rejection code, and the claim strength of each. */
-  readonly rejections: ReadonlyArray<{ reason: string; count: number; proven: boolean }>
+  readonly rejections: ReadonlyArray<{ reason: RejectionCode; count: number; proven: boolean }>
   /** How many stage-C verdicts hit a cap rather than finishing their search. */
   readonly cutShort: number
 }
 
-/** §4 — only stages A and B produce proofs. Stage C is bounded. */
-const PROVEN: ReadonlySet<string> = new Set(['unsolvable_chemistry', 'over_budget_floor'])
+/**
+ * §4 — only stages A and B produce proofs. Stage C is bounded, both of its
+ * empty-handed codes included: one is bounded by the plan caps and the other by
+ * the attempt cap, but neither is evidence that no solution exists.
+ */
+const PROVEN: ReadonlySet<RejectionCode> = new Set<RejectionCode>([
+  'unsolvable_chemistry',
+  'over_budget_floor',
+  'insufficient_fanout',
+])
 
 export function summarise(records: readonly CandidateRecord[]): BatchSummary {
-  const counts = new Map<string, number>()
+  const counts = new Map<RejectionCode, number>()
   for (const record of records) {
     if (record.reason === null) continue
     counts.set(record.reason, (counts.get(record.reason) ?? 0) + 1)

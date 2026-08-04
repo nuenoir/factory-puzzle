@@ -27,16 +27,33 @@ import {
 } from '@factory/sim'
 
 import { routeBelts } from './router.ts'
-import { canonicalPlan, enumeratePlans, type Plan, type PlanNode } from './planner.ts'
+import {
+  canonicalPlan,
+  enumeratePlans,
+  DEFAULT_PLAN_LIMITS,
+  type Plan,
+  type PlanLimits,
+  type PlanNode,
+} from './planner.ts'
 
-export interface SearchLimits {
+/**
+ * Every cap stage C is subject to. §4 requires all of them in the log, because
+ * an empty search is only interpretable next to what it was allowed to do — and
+ * the two plan caps bound a different thing from the two attempt caps, which is
+ * why `no_plan_within_depth` and `no_placement_found` are separate verdicts.
+ */
+export interface SearchLimits extends PlanLimits {
   /** Random restarts tried per plan. */
   readonly attemptsPerPlan: number
   /** Wall-clock ceiling for the whole search. */
   readonly timeoutMs: number
 }
 
-export const DEFAULT_SEARCH_LIMITS: SearchLimits = { attemptsPerPlan: 250, timeoutMs: 4000 }
+export const DEFAULT_SEARCH_LIMITS: SearchLimits = {
+  ...DEFAULT_PLAN_LIMITS,
+  attemptsPerPlan: 250,
+  timeoutMs: 4000,
+}
 
 /** Where an attempt died. Aggregated so the search can be tuned on evidence. */
 export interface AttemptTally {
@@ -348,7 +365,10 @@ export function solve(
   limits: SearchLimits = DEFAULT_SEARCH_LIMITS,
   now: () => number = Date.now,
 ): SolveOutcome {
-  const plans = enumeratePlans(level)
+  // The plan caps are part of the bound now, so they have to come from the
+  // limits rather than from the enumerator's own defaults — otherwise the log
+  // would report a cap the search did not actually run under.
+  const plans = enumeratePlans(level, limits)
   const random = mulberry32(seed)
   const deadline = now() + limits.timeoutMs
 

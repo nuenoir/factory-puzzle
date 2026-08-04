@@ -9,6 +9,7 @@
 export {
   reachableTypes,
   isProducible,
+  deliverableWithoutFanout,
   machineFloor,
   type MachineFloor,
   type ProducerType,
@@ -32,6 +33,7 @@ export { solve, DEFAULT_SEARCH_LIMITS, type SearchLimits, type SolveOutcome, typ
 export {
   validate,
   withComputedPar,
+  ALL_REJECTION_CODES,
   DEFAULT_CRITERIA,
   type Criteria,
   type RejectionCode,

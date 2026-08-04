@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Level } from '@factory/sim'
 
-import { isProducible, machineFloor, reachableTypes } from '../src/index'
+import { deliverableWithoutFanout, isProducible, machineFloor, reachableTypes } from '../src/index'
 
 function makeLevel(overrides: Partial<Level> = {}): Level {
   return {
@@ -158,5 +158,124 @@ describe('§4 stage B — machine floor', () => {
       recipes: { press: { circle: 'disc', disc: 'circle' } },
     })
     expect(machineFloor(cyclic)).toBeNull()
+  })
+})
+
+describe('§4 stage B — fan-out feasibility', () => {
+  /**
+   * The claim here is *proven*, so a false positive would put a lie in the
+   * write-up. Every test below is really asking one question: can this level's
+   * target be built by a strict tree whose leaves are distinct sources? Without
+   * a splitter nothing else is buildable, because every other building in the
+   * palette has exactly one output port.
+   */
+
+  it('refuses a same-type pair fed by a single source', () => {
+    // disc + disc -> widget with one source of circle. The two assembler ports
+    // both trace back to the only source there is, and one source has one
+    // output port. No arrangement of belts can fix that.
+    expect(deliverableWithoutFanout(level001)).toBe(false)
+  })
+
+  it('allows a same-type pair when two distinct sources can each reach it', () => {
+    // The soundness case that matters most. Same recipe, but circle now comes
+    // out of two separate sources, so the two arms need no fan-out at all.
+    const twoSources = makeLevel({
+      sources: [
+        { pos: [0, 2], rotation: 0, emits: 'circle' },
+        { pos: [0, 4], rotation: 0, emits: 'circle' },
+      ],
+      recipes: level001.recipes,
+    })
+    expect(deliverableWithoutFanout(twoSources)).toBe(true)
+  })
+
+  it('allows a pair of two genuinely different types', () => {
+    const distinct = makeLevel({
+      sources: [
+        { pos: [0, 2], rotation: 0, emits: 'circle' },
+        { pos: [0, 4], rotation: 0, emits: 'square' },
+      ],
+      recipes: {
+        press: { circle: 'disc', square: 'plate' },
+        assembler: [{ in: ['disc', 'plate'], out: 'widget' }],
+      },
+    })
+    expect(deliverableWithoutFanout(distinct)).toBe(true)
+  })
+
+  it('refuses a two-type pair when both types come from the same source', () => {
+    // disc and plate are different types but the same *source* has to supply
+    // both chains, which needs a fan-out just as much as disc + disc does.
+    const shared = makeLevel({
+      recipes: {
+        press: { circle: 'disc', disc: 'plate' },
+        assembler: [{ in: ['disc', 'plate'], out: 'widget' }],
+      },
+    })
+    expect(deliverableWithoutFanout(shared)).toBe(false)
+  })
+
+  it('allows a plain press chain, which never needs to fan out', () => {
+    const chain = makeLevel({
+      target: { type: 'plate', count: 5 },
+      recipes: { press: { circle: 'disc', disc: 'plate' } },
+    })
+    expect(deliverableWithoutFanout(chain)).toBe(true)
+  })
+
+  it('allows delivering the source item itself', () => {
+    expect(deliverableWithoutFanout(makeLevel({ target: { type: 'circle', count: 5 }, recipes: {} }))).toBe(true)
+  })
+
+  it('takes the cheaper route when one arm has a fan-out-free alternative', () => {
+    // widget can be made two ways: an assembler needing two circles (needs a
+    // fan-out) or a straight press from circle (does not). One route being
+    // feasible is enough, so this must not fire.
+    const both = makeLevel({
+      recipes: {
+        press: { circle: 'widget' },
+        assembler: [{ in: ['circle', 'circle'], out: 'widget' }],
+      },
+    })
+    expect(deliverableWithoutFanout(both)).toBe(true)
+  })
+
+  it('is not fooled by a recipe cycle', () => {
+    const cyclic = makeLevel({
+      target: { type: 'widget', count: 1 },
+      recipes: {
+        press: { circle: 'disc', disc: 'circle' },
+        assembler: [{ in: ['disc', 'disc'], out: 'widget' }],
+      },
+    })
+    // Still one source feeding two ports, however long you go round the loop.
+    expect(deliverableWithoutFanout(cyclic)).toBe(false)
+  })
+
+  it('sees a route no depth-bounded search would find', () => {
+    // This is why the enumeration must not carry a depth limit. The only
+    // fan-out-free route to `widget` runs five presses deep down the second
+    // source; a search capped at the planner's depth of 4 would miss it and
+    // report a *proof* of impossibility, which would be a false claim.
+    const deep = makeLevel({
+      sources: [
+        { pos: [0, 2], rotation: 0, emits: 'circle' },
+        { pos: [0, 4], rotation: 0, emits: 'seed' },
+      ],
+      recipes: {
+        press: { circle: 'disc', seed: 'a', a: 'b', b: 'c', c: 'd', d: 'disc' },
+        assembler: [{ in: ['disc', 'disc'], out: 'widget' }],
+      },
+    })
+    expect(deliverableWithoutFanout(deep)).toBe(true)
+  })
+
+  it('ignores recipes whose machine the level does not offer', () => {
+    // No assembler means no route to widget at all — but that is stage A's
+    // rejection to make, not this one's. With nothing derivable this returns
+    // false, and the validator only consults it after stage A has passed.
+    const noAssembler = makeLevel({ available: ['conveyor', 'press'], recipes: level001.recipes })
+    expect(isProducible(noAssembler)).toBe(false)
   })
 })

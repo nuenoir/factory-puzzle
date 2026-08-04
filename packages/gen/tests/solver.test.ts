@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest'
 import { simulate, type Level } from '@factory/sim'
 
-import { canonicalPlan, solve } from '../src/index'
+import { canonicalPlan, solve, DEFAULT_SEARCH_LIMITS } from '../src/index'
 
 function makeLevel(overrides: Partial<Level> = {}): Level {
   return {
@@ -28,7 +28,7 @@ function makeLevel(overrides: Partial<Level> = {}): Level {
 }
 
 /** A generous budget so these tests measure the search, not the clock. */
-const patient = { attemptsPerPlan: 400, timeoutMs: 30000 }
+const patient = { ...DEFAULT_SEARCH_LIMITS, attemptsPerPlan: 400, timeoutMs: 30000 }
 
 describe('solve', () => {
   it('finds a working factory for level 001', () => {
@@ -96,7 +96,7 @@ describe('solve', () => {
 
   it('finds nothing when the chemistry cannot reach the target', () => {
     const impossible = makeLevel({ recipes: { press: { circle: 'disc' } } })
-    const outcome = solve(impossible, 1, { attemptsPerPlan: 20, timeoutMs: 2000 })
+    const outcome = solve(impossible, 1, { ...patient, attemptsPerPlan: 20, timeoutMs: 2000 })
     expect(outcome.cheapest).toBeNull()
     expect(outcome.plansTried).toBe(0)
   })
@@ -104,7 +104,7 @@ describe('solve', () => {
   it('reports being cut short rather than pretending it looked everywhere', () => {
     // §4: a bounded search must never let "no solution found" read as proof.
     let clock = 0
-    const outcome = solve(makeLevel(), 1, { attemptsPerPlan: 10000, timeoutMs: 5 }, () => (clock += 4))
+    const outcome = solve(makeLevel(), 1, { ...patient, attemptsPerPlan: 10000, timeoutMs: 5 }, () => (clock += 4))
     expect(outcome.exhausted).toBe(false)
   })
 

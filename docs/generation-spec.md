@@ -1,4 +1,4 @@
-# Generation and Validation — Spec v0.1
+# Generation and Validation — Spec v0.2
 
 **Purpose.** Defines what the generator proposes, what the validator checks, and — most importantly — what the validator is allowed to *claim*. This document is authoritative for `packages/gen/` the way `rules-spec.md` is for `packages/sim/`.
 
@@ -66,6 +66,16 @@ This is exact, and it rejects most malformed candidates for almost nothing. It i
 
 From the recipe DAG, derive the minimum multiset of machines needed to produce one target item, and hence a **lower bound** on cost. If that bound already exceeds `max_cost`, reject without placing anything. If it falls below `min_cost`, the candidate is *probably* trivial, but this is only a bound — confirm in stage C before rejecting as trivial.
 
+### Stage B — fan-out feasibility *(microseconds, exact)*
+
+Stage A closes over the recipe tables and asks only whether the target *type* is reachable. That ignores how many items a building can hand out at once, and the difference is not academic: an assembler recipe `disc + disc -> widget` needs two discs at two ports simultaneously, and **every building in §4 of the rules spec has exactly one output port except the splitter**.
+
+So without a splitter a derivation must be a strict tree, and each leaf of that tree must be a *distinct source* — one source has one output port and cannot supply two chains. A level whose only route to the target needs the same source twice is **provably unsolvable**, no matter how the grid is filled.
+
+The check: enumerate the multisets of source indices that some derivation of the target can bottom out at, and ask whether any of them is repeat-free. If none is, and `splitter` is not in `available`, reject. When a splitter *is* available the check is skipped — a chain of splitters can supply any fan-out a plan asks for.
+
+This is exact in the same sense stage A is, and it closes a real gap. Five of the first fifty candidates are rejected here; every one of them is an `x + x -> target` assembler recipe on a level with no splitter, and previously all five were filed under the *bounded* stage-C code, which understated what the validator could actually prove. Erring toward the weaker claim is the safe direction to err, but it is still wrong.
+
 ### Stage C — placement and routing *(bounded, inexact)*
 
 Search over *plans* rather than over cells. A plan is a small dataflow graph — which machines exist and what feeds what — derived from the recipe DAG. For each plan:
@@ -87,14 +97,22 @@ Random restarts are cheap but wasteful. On level 001, roughly **1.5% of attempts
 | Outcome | Count | Claim |
 |---|---|---|
 | accepted | 3 | — |
-| `no_solution_found` | 22 | bounded |
+| `no_placement_found` | 17 | bounded (attempt cap) |
 | `single_solution` | 15 | bounded |
-| `unsolvable_chemistry` | 6 | proven |
+| `unsolvable_chemistry` | 6 | **proven** |
+| `insufficient_fanout` | 5 | **proven** |
 | `over_budget` | 4 | bounded |
+| `no_plan_within_depth` | 0 | bounded (plan caps) |
 
-`no_solution_found` dominating is the signal that **the search, not the chemistry, is now the limit**. Among those candidates every single attempt died at routing — none reached simulation — which is the shape of a systematic problem rather than bad luck.
+`no_placement_found` dominating is the signal that **the search, not the chemistry, is now the limit**. Of 16,500 attempts, 15,667 (95.0%) died at routing and 833 (5.0%) won; **not one** failed at placement, at port geometry, or at simulation. The bottleneck is entirely geometric — machines land where belts cannot reach them — which is the shape of a systematic problem rather than bad luck.
 
-Two tuning changes were measured against this batch. Varying the order belts are routed in helped: accepted 2 → 3, `no_solution_found` 23 → 22. Sampling runner-up rotations instead of always taking the best-aligned one **hurt**, pushing `no_solution_found` from 23 to 29, because attempts spent on worse orientations are attempts not spent on fresh placements. It was reverted. Recording the negative result matters as much as the positive one: it is the evidence against the obvious next idea.
+`no_plan_within_depth` scoring zero is worth recording rather than hiding: every candidate whose enumerator came up empty turned out to be provably fan-out-infeasible, so the planner's depth cap was never the binding constraint on this batch. The code stays, because that is a fact about these fifty candidates and not a guarantee about the next fifty.
+
+Eleven of the fifty rejections are now proofs rather than bounded searches, against six before the fan-out check existed. Nothing about which candidates are accepted changed — the same five were already rejected — but the validator can now say *why* about nearly twice as many of them.
+
+Two tuning changes were measured against this batch. Varying the order belts are routed in helped: accepted 2 → 3, candidates finding no solution 23 → 22. Sampling runner-up rotations instead of always taking the best-aligned one **hurt**, pushing that count from 23 to 29, because attempts spent on worse orientations are attempts not spent on fresh placements. It was reverted. Recording the negative result matters as much as the positive one: it is the evidence against the obvious next idea.
+
+(Both numbers predate the code split, when a single `no_solution_found` covered what is now `insufficient_fanout`, `no_plan_within_depth` and `no_placement_found`. The five fan-out candidates were in every one of those counts and never reached the search, so the deltas the measurements report are unaffected.)
 
 All three accepted levels share the same shape — an assembler consuming two of one item — because that is what creates the press-then-split versus split-then-press choice. Criterion 4 is therefore selecting for level 001's structure, which is reassuring and also a limitation: the generator currently has one way of making a puzzle interesting.
 
@@ -104,10 +122,20 @@ The honest summary is that this search finds *a* solution often enough to judge 
 
 Stage C is bounded by a plan cap, a placement cap, and a wall-clock timeout, all recorded per candidate. This matters for honesty:
 
-- Stage A rejecting means **provably unsolvable**. Code: `unsolvable_chemistry`.
-- Stage C finding nothing means **no solution found within the bound**. Code: `no_solution_found`.
+- Stage A rejecting means **provably unsolvable** — no arrangement of anything could help. Code: `unsolvable_chemistry`.
+- Stage B rejecting means **provably unsolvable** too, for a different reason: either the cheapest conceivable machine set already blows the budget (`over_budget_floor`), or the target needs a fan-out the level has no splitter for (`insufficient_fanout`).
+- Stage C finding nothing means **no solution found within the bound**, which is not a proof of anything.
 
-These are different claims and must never share a code. The write-up can say "N candidates were provably unsolvable" only about the first. Conflating them would overstate what the validator knows, which is precisely the kind of thing a reader who knows search would catch.
+These are different claims and must never share a code. The write-up can say "N candidates were provably unsolvable" only about the first two. Conflating them would overstate what the validator knows, which is precisely the kind of thing a reader who knows search would catch.
+
+**"No solution found" is itself two different bounds**, and they too get separate codes. A stage-C search can come up empty because the plan enumerator never produced anything to place, or because plans existed and no placement of them worked:
+
+- `no_plan_within_depth` — the enumerator returned no buildable plan within `maxDepth` and `maxPlans`. Bounded by the *plan* caps. Nothing was ever placed, so the attempt tally is empty and the placement search says nothing about this candidate.
+- `no_placement_found` — plans existed, and `attemptsPerPlan` restarts of each failed to produce a layout the simulator would pass. Bounded by the *attempt* cap.
+
+The two have different fixes — a deeper enumerator versus a better placement heuristic — so a log that cannot tell them apart cannot tell you where to push. Both plan caps are therefore recorded in `bound` alongside the attempt caps, so either verdict can be argued with from the log line alone.
+
+Note the asymmetry: `insufficient_fanout` and `no_plan_within_depth` can look similar from outside — both mean "the enumerator had nothing" — but one is a proof about ports and the other is an admission about search depth. Getting that boundary right is the whole reason stage B exists as a separate stage.
 
 ---
 
@@ -134,30 +162,41 @@ One JSON object per candidate, one per line (JSONL), appended as the batch runs 
 
 ```json
 {
-  "id": "gen-0042",
-  "seed": 1337,
+  "id": "gen-42",
+  "seed": 42,
   "accepted": false,
   "reason": "single_solution",
   "stage": "C",
   "elapsed_ms": 812,
   "solutions_found": 1,
+  "distinct_forms": 1,
   "cheapest_cost": 14,
-  "bound": { "plans": 40, "placements": 5000, "timeout_ms": 2000, "exhausted": true }
+  "floor_cost": 8,
+  "par": null,
+  "bound": { "maxDepth": 4, "maxPlans": 40, "attemptsPerPlan": 250, "timeoutMs": 4000,
+             "plansTried": 2, "attempts": 500, "exhausted": true },
+  "tally": { "placement": 0, "ports": 0, "routing": 498, "simulation": 0, "won": 2 }
 }
 ```
+
+`bound` carries every cap the search was subject to — the two plan caps and the two attempt caps — next to what it actually consumed. `tally` counts where each attempt died, so the log says not just *that* a search failed but *where*, which is what makes it possible to tune the search on evidence rather than intuition.
 
 `reason` is `null` on acceptance and otherwise exactly one of:
 
 | Code | Stage | Claim strength |
 |---|---|---|
-| `unsolvable_chemistry` | A | Proven |
-| `over_budget_floor` | B | Proven (lower bound already exceeds `max_cost`) |
-| `no_solution_found` | C | **Bounded** — not a proof of unsolvability |
+| `unsolvable_chemistry` | A | **Proven** — the target type is not in the recipe closure |
+| `over_budget_floor` | B | **Proven** — the machine floor alone already exceeds `max_cost` |
+| `insufficient_fanout` | B | **Proven** — every route needs a fan-out and no splitter is available |
+| `no_plan_within_depth` | C | **Bounded by the plan caps** — the enumerator produced nothing buildable |
+| `no_placement_found` | C | **Bounded by the attempt cap** — plans existed, no layout of them won |
 | `trivial` | C | Cheapest found is below `min_cost`, or uses only conveyors |
 | `over_budget` | C | Cheapest found exceeds `max_cost` |
 | `single_solution` | C | Fewer than two materially different solutions found |
 
 `bound.exhausted` records whether stage C finished its search or hit a cap — the difference between "looked everywhere we allowed" and "ran out of time". Any headline number in the write-up should state how many candidates hit a cap.
+
+The example above shows the shape the batch actually emits. An earlier draft of this section used shorter field names (`plans`, `placements`, `timeout_ms`); the code's richer shape won, and this is the deliberate spec change rather than a drift to fix.
 
 ---
 
@@ -184,3 +223,13 @@ The simulator contributes no randomness (CLAUDE.md), so this reduces to: the gen
 | 7 | Proven vs bounded rejection | Separate codes, never merged (§4) | Accepted |
 | 8 | Log format | JSONL, appended live | Accepted |
 | 9 | `max_ticks` | 300, fixed | Accepted |
+
+**Amended 4 Aug 2026 (v0.2).** Three changes, all to what the validator is allowed to *claim* rather than to what it accepts:
+
+| # | Decision | Choice |
+|---|---|---|
+| 10 | Fan-out feasibility | New exact stage-B check, code `insufficient_fanout`, **proven** (§4) |
+| 11 | Splitting `no_solution_found` | Two codes by which bound was binding: `no_plan_within_depth` and `no_placement_found` (§4) |
+| 12 | Plan caps in the log | `maxDepth` and `maxPlans` recorded in `bound`, so a plan-bounded verdict is arguable from the log line |
+
+Decision 10 changes which candidates are accepted only in the sense that it moves five rejections from a bounded code to a proven one — the same five candidates were already rejected. Decisions 11 and 12 change nothing about acceptance at all. The batch was re-run after all three, per the note above.

@@ -9,17 +9,29 @@
 
 import { COST, type Level, type Solution } from '@factory/sim'
 
-import { isProducible, machineFloor } from './chemistry.ts'
+import { deliverableWithoutFanout, isProducible, machineFloor } from './chemistry.ts'
 import { DEFAULT_SEARCH_LIMITS, solve, type AttemptTally, type SearchLimits } from './solver.ts'
 
-/** §6. Exactly one of these, or null on acceptance. */
-export type RejectionCode =
-  | 'unsolvable_chemistry'
-  | 'over_budget_floor'
-  | 'no_solution_found'
-  | 'trivial'
-  | 'over_budget'
-  | 'single_solution'
+/**
+ * §6. Exactly one of these, or null on acceptance.
+ *
+ * Listed rather than merely typed, because `summarise` has to label each one
+ * proven or bounded and a code nobody classified would silently report as
+ * bounded — understating the validator instead of overstating it, which is the
+ * safer direction to be wrong in but still wrong.
+ */
+export const ALL_REJECTION_CODES = [
+  'unsolvable_chemistry',
+  'over_budget_floor',
+  'insufficient_fanout',
+  'no_plan_within_depth',
+  'no_placement_found',
+  'trivial',
+  'over_budget',
+  'single_solution',
+] as const
+
+export type RejectionCode = (typeof ALL_REJECTION_CODES)[number]
 
 export interface Criteria {
   /** §3.2 — below this a puzzle is not worth playing. */
@@ -41,9 +53,8 @@ export interface Verdict {
   /** §2 — computed, never proposed. Null unless the candidate was accepted. */
   readonly par: number | null
   readonly floorCost: number | null
-  readonly bound: {
-    readonly attemptsPerPlan: number
-    readonly timeoutMs: number
+  /** Every cap stage C ran under, next to what it actually consumed (§4). */
+  readonly bound: SearchLimits & {
     readonly plansTried: number
     readonly attempts: number
     /** False means the search was cut short, so silence proves nothing. */
@@ -97,6 +108,15 @@ export function validate(
     return reject('over_budget_floor', 'B', limits, { floorCost: floor.cost })
   }
 
+  // Stage B — port capacity, also exact. Stage A's closure tracks types and not
+  // how many consumers a building can feed, so a level can be reachable on
+  // paper and still impossible: an `x + x -> target` recipe needs two x at once
+  // and only a splitter fans out. Cheap to decide, and it is a proof, so it
+  // must not be left to the bounded search below to shrug at.
+  if (!level.available.includes('splitter') && !deliverableWithoutFanout(level)) {
+    return reject('insufficient_fanout', 'B', limits, { floorCost: floor.cost })
+  }
+
   // Stage C — bounded. Everything below is "within the search we allowed".
   const outcome = solve(level, seed, limits, now)
   const bound = {
@@ -116,7 +136,11 @@ export function validate(
   }
 
   if (outcome.cheapest === null) {
-    return { accepted: false, reason: 'no_solution_found', par: null, ...common }
+    // Two different bounds were binding, and they have two different fixes: a
+    // deeper enumerator versus a better placement heuristic. A single code
+    // could not tell you which, so the log would not say where to push (§4).
+    const reason = outcome.plansTried === 0 ? 'no_plan_within_depth' : 'no_placement_found'
+    return { accepted: false, reason, par: null, ...common }
   }
 
   const cheapest = outcome.cheapest

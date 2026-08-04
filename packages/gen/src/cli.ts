@@ -53,6 +53,24 @@ for (const row of summary.rejections) {
   process.stdout.write(`    ${row.reason.padEnd(22)} ${String(row.count).padStart(3)}  ${pct(row.count).padStart(4)}  ${claim}\n`)
 }
 
+// The tally is what says *where* a bounded search died, and therefore where
+// tuning it would pay. Aggregated here so a batch run reports it without anyone
+// having to total up the log by hand.
+const tally = { placement: 0, ports: 0, routing: 0, simulation: 0, won: 0 }
+let attempts = 0
+for (const record of records) {
+  for (const stage of Object.keys(tally) as (keyof typeof tally)[]) tally[stage] += record.tally[stage]
+  attempts += record.bound.attempts
+}
+
+if (attempts > 0) {
+  const share = (n: number) => `${((n / attempts) * 100).toFixed(1)}%`
+  process.stdout.write(`\n  ${attempts} placement attempts, by where they died\n`)
+  for (const [stage, n] of Object.entries(tally)) {
+    process.stdout.write(`    ${stage.padEnd(22)} ${String(n).padStart(6)}  ${share(n).padStart(6)}\n`)
+  }
+}
+
 if (summary.cutShort > 0) {
   process.stdout.write(
     `\n  ${summary.cutShort} search(es) hit a cap rather than finishing, so their\n` +
