@@ -34,7 +34,7 @@ The validator answers four questions: is it solvable, is it non-trivial, does it
 
 **Stage C** is the expensive one: enumerate *plans* (which machines, what feeds what), place them, route belts with a breadth-first search, and simulate. The router only finds lanes; whether the factory actually delivers is the simulator's call.
 
-Across fifty candidates, stages A and B settled eleven of them in about a millisecond. The whole batch — fifty puzzles, sixteen and a half thousand placement attempts — took **703ms**. Ordering the checks by cost is most of why.
+Across fifty candidates, stages A and B settled eleven of them in **2 milliseconds between them**. The whole batch — fifty puzzles, sixteen and a half thousand placement attempts — took **1.1 seconds**. Ordering the checks by cost is most of why.
 
 ## What the validator is allowed to claim
 
@@ -99,15 +99,15 @@ Fifty candidates, one seed, fully reproducible:
 
 | Outcome | Count | Claim |
 |---|---:|---|
-| accepted | 3 | — |
-| `no_placement_found` | 17 | bounded — attempt cap |
-| `single_solution` | 15 | bounded |
+| accepted | 5 | — |
+| `no_placement_found` | 18 | bounded — attempt cap |
+| `single_solution` | 13 | bounded |
 | `unsolvable_chemistry` | 6 | **proven** |
 | `insufficient_fanout` | 5 | **proven** |
-| `over_budget` | 4 | bounded |
+| `over_budget` | 3 | bounded |
 | `no_plan_within_depth` | 0 | bounded — plan caps |
 
-None of the searches were cut short — every stage-C verdict ran its full allowance. Accepted puzzles came out at par 23, 24 and 26.
+None of the searches were cut short — every stage-C verdict ran its full allowance. Accepted puzzles came out at par 21, 22, 23, 23 and 23.
 
 That last row scoring zero is worth leaving in the table rather than deleting. It says the planner's depth cap was never the binding constraint on these fifty candidates: every empty enumeration turned out to be provably impossible instead. That's a fact about this batch, not a guarantee, and the code stays.
 
@@ -115,13 +115,41 @@ Where the 16,500 attempts went:
 
 | Died at | Count | Share |
 |---|---:|---:|
-| routing | 15,667 | 95.0% |
-| won | 833 | 5.0% |
+| routing | 15,638 | 94.8% |
+| won | 862 | 5.2% |
 | placement | 0 | 0.0% |
 | port geometry | 0 | 0.0% |
 | simulation | 0 | 0.0% |
 
 Three of those five rows are zero, and that's the most useful thing in the table. Nothing ever failed to *place* its machines, and nothing that routed then failed to run. The bottleneck is one thing only: machines landing where belts can't reach them.
+
+## Spending the same budget differently
+
+That table is a suggestion, so I took it. If 95% of attempts die at routing, then 95% of the time the machines were down and *one belt run* couldn't find a lane — and the whole attempt, placement included, got thrown away. Wiring is much cheaper to redo than placement. So: re-pair the ports, re-order the belt runs, try again on the same cells before abandoning them.
+
+I did not trust fifty candidates to settle this. Acceptance moves by two or three, and changing a search parameter reshuffles the entire random stream, so an arm can look better for no reason at all — which is exactly how the rotation experiment above fooled me into trying it. Measured over **200 candidates across four independent seed ranges**, paired:
+
+| accepted / 50 | 1 pass | 2 passes | 4 passes |
+|---|---:|---:|---:|
+| seeds 1–50 | 3 | 5 | 6 |
+| seeds 101–150 | 4 | 7 | 6 |
+| seeds 201–250 | 3 | 5 | 4 |
+| seeds 301–350 | 0 | 6 | 7 |
+| **total** | **10** | **23** | **23** |
+
+Two passes wins in all four ranges. Four ties it and costs 40% more wall clock, so two it is.
+
+Then the interesting bit, which I'd have got wrong if I'd only looked at the headline:
+
+| across 200 candidates | 1 pass | 2 passes |
+|---|---:|---:|
+| winning attempts | 6,891 | 7,173 (+4%) |
+| levels with ≥1 solution | 105 | 110 (+5%) |
+| levels with ≥2 distinct forms | 10 | 23 (**+130%**) |
+
+Retrying the wiring barely wins more often. It wins on the **second** solution. The second plan is the machine-dense one — split-then-press buys an extra press — so it needs more belt runs through a grid that's already fuller, and it's precisely the layout that placement restarts alone could almost never wire. Acceptance requires two materially different solutions, so criterion 4 had been gated not by whether a puzzle *has* two ideas but by whether my router could realise the harder one. That's a measurement artefact sitting inside an acceptance criterion, and nothing about the criterion would have revealed it.
+
+**The part I care about more than the acceptance rate.** Par is the cheapest solution *found*, which means a weak search ships a generous one. Two of the already-accepted levels had their par tightened by the same change: `gen-1` from 26 down to **21**, `gen-20` from 24 to 23. Those puzzles were shipping a par you could beat without trying, and nothing in the pipeline would have flagged it — the level was accepted, the par was verified, the number was just *loose*. A better search doesn't only accept more puzzles. It scores the ones it already accepted more honestly, and that's the failure mode I'd least like to have shipped.
 
 ## What surprised me
 
@@ -135,13 +163,15 @@ Fixing that exposed a second one: one plan had a single source feeding two press
 
 **A search problem turned out to be an arithmetic problem.** Splitting one rejection code into two was meant to be bookkeeping. It surfaced five levels that were provably impossible for a reason no amount of searching would have found, because the impossibility was about port counts and the search was about geometry. I'd been treating "the solver found nothing" as a single phenomenon for the entire project.
 
+**The weakness of the search was leaking into the puzzles.** I thought a bounded search cost me candidates it couldn't solve. It also cost me *accuracy on the ones it could* — par is the cheapest solution found, so every gap in the search showed up as a puzzle scored too generously. Improving the router dropped one accepted level's par from 26 to 21. Nothing was broken; the number was just soft, and no test could have told me, because "cheapest found" is exactly what it claimed to be.
+
 ## Limitations, plainly
 
 The search is bounded and nowhere near exhaustive. It finds *a* solution often enough to judge a level — about 5% of attempts succeed — and its silence is never evidence of impossibility.
 
-The 6% acceptance rate is low. A daily puzzle stream would need either bigger batches or a better placement heuristic; the log says where to push, since 34% of candidates now fail in placement rather than chemistry, and 95% of individual attempts die at routing.
+The 10% acceptance rate is still low, and 36% of candidates fail in placement rather than chemistry. The retry change bought a lot and the remaining ceiling is the same one: 94.8% of attempts still die at routing. The next thing I'd try is letting the router rip up a blocking belt run and re-lay it rather than failing the pass, which is a real search rather than the reshuffle-and-hope this one is. I'd measure it the same way, over 200 candidates paired by seed range, because that's the only reason I know the last change worked.
 
-All three accepted puzzles share the same shape — an assembler consuming two of one item — because that's the only structure the generator currently has for creating a real choice. Criterion 4 is faithfully selecting for it, which is both reassuring and a ceiling. The fan-out check sharpens that observation into something slightly uncomfortable: the generator's one interesting shape is also the one that's impossible without a splitter, and it withholds the splitter 25% of the time. Five of the fifty candidates were doomed at the moment they were proposed.
+All five accepted puzzles share the same shape — an assembler consuming two of one item — because that's the only structure the generator currently has for creating a real choice. Criterion 4 is faithfully selecting for it, which is both reassuring and a ceiling. The fan-out check sharpens that observation into something slightly uncomfortable: the generator's one interesting shape is also the one that's impossible without a splitter, and it withholds the splitter 25% of the time. Five of the fifty candidates were doomed at the moment they were proposed.
 
 The obvious fix — have the generator always offer a splitter when it writes an `x + x` recipe — is one I've deliberately not made. The spec's §2 says the generator proposes and the validator disposes, and that pre-screening its own output would hollow out the rejection log. Those five rejections are real information about a real generator. Laundering them away would make the acceptance rate look better and the artifact worth less.
 
@@ -151,4 +181,4 @@ And the refinement I'd make next: the placement search. 95% of attempts die at r
 
 The game is at **[nuenoir.github.io/factory-puzzle](https://nuenoir.github.io/factory-puzzle/)**. Source at **[github.com/nuenoir/factory-puzzle](https://github.com/nuenoir/factory-puzzle)**, including [the rules spec](rules-spec.md), [the generation spec](generation-spec.md), and [the tick-by-tick derivation](level-001.md) that the simulator had to match.
 
-174 tests. The suite is mutation-tested — an earlier version passed against a simulator whose round-robin flag never flipped, because it asserted on item counts rather than watching the mechanic. A green suite is not automatically a correct one. The fan-out check got the same treatment before I trusted it: eight deliberate breakages, including one that quietly reintroduces the depth bound, and the suite has to go red for all of them.
+179 tests. The suite is mutation-tested — an earlier version passed against a simulator whose round-robin flag never flipped, because it asserted on item counts rather than watching the mechanic. A green suite is not automatically a correct one. The generator work got the same treatment before I trusted it: twelve deliberate breakages, including one that quietly reintroduces the depth bound the fan-out proof must not have, and the suite has to go red for every one.

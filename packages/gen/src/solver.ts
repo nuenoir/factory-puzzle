@@ -43,8 +43,24 @@ import {
  * why `no_plan_within_depth` and `no_placement_found` are separate verdicts.
  */
 export interface SearchLimits extends PlanLimits {
-  /** Random restarts tried per plan. */
+  /** Random restarts tried per plan. Each one places every machine afresh. */
   readonly attemptsPerPlan: number
+  /**
+   * Wiring passes per placement before the placement itself is abandoned.
+   *
+   * Machines land, and then one belt run cannot find a lane — but the placement
+   * was fine and only the wiring was unlucky. Re-pairing the ports and re-
+   * ordering the belt runs is far cheaper than finding somewhere new to put
+   * everything, so it is worth a few goes first. 1 reproduces the original
+   * behaviour exactly, where any routing failure discarded the whole attempt.
+   *
+   * 2 was measured, not guessed. Over 200 candidates across four independent
+   * seed ranges it took accepted from 10 to 23, winning in all four when paired
+   * by range. 4 tied it on acceptance and cost 40% more wall clock. See §4 of
+   * the generation spec for the numbers and for why the gain is not where you
+   * would expect it.
+   */
+  readonly routeRetries: number
   /** Wall-clock ceiling for the whole search. */
   readonly timeoutMs: number
 }
@@ -52,6 +68,7 @@ export interface SearchLimits extends PlanLimits {
 export const DEFAULT_SEARCH_LIMITS: SearchLimits = {
   ...DEFAULT_PLAN_LIMITS,
   attemptsPerPlan: 250,
+  routeRetries: 2,
   timeoutMs: 4000,
 }
 
@@ -229,7 +246,7 @@ type AttemptResult =
  * Try to realise one plan as a real layout. Succeeds only when `simulate` says
  * the factory wins — routing successfully is not the same as working.
  */
-function attempt(level: Level, plan: Plan, random: () => number): AttemptResult {
+function attempt(level: Level, plan: Plan, random: () => number, retries: number): AttemptResult {
   const { width, height } = level.grid
   const depths = depthsOf(plan)
   const maxDepth = Math.max(1, ...depths.values())
@@ -269,6 +286,36 @@ function attempt(level: Level, plan: Plan, random: () => number): AttemptResult 
     cells.set(node.id, placed)
   }
 
+  const byId = new Map(plan.nodes.map((n) => [n.id, n]))
+
+  // The machines are down. Everything below is wiring, and wiring is cheap to
+  // redo compared with finding somewhere new to put a factory — so a run that
+  // cannot find a lane gets the pairing and the belt order shuffled and tries
+  // again, rather than throwing the placement away with it.
+  let lastFailure: AttemptResult = { ok: false, stage: 'routing' }
+  for (let retry = 0; retry < Math.max(1, retries); retry += 1) {
+    const wired = wire(level, plan, cells, taken, byId, random)
+    if (wired.ok) return wired
+    lastFailure = wired
+    // A missing port is a property of the plan and the placement, not of this
+    // wiring pass. Shuffling again would fail identically.
+    if (wired.stage === 'ports') break
+  }
+  return lastFailure
+}
+
+/**
+ * One wiring pass over a fixed placement: pair the ports, orient the machines,
+ * lay the belts, and let `simulate` say whether the result is a factory.
+ */
+function wire(
+  level: Level,
+  plan: Plan,
+  cells: ReadonlyMap<number, PosTuple>,
+  taken: ReadonlySet<string>,
+  byId: ReadonlyMap<number, PlanNode>,
+  random: () => number,
+): AttemptResult {
   const edges = shufflePortPairing(edgesOf(plan), random)
 
   // Orient each machine so its ports point roughly at what they connect to.
@@ -302,7 +349,6 @@ function attempt(level: Level, plan: Plan, random: () => number): AttemptResult 
     rotations.set(node.id, scored[0].rotation)
   }
 
-  const byId = new Map(plan.nodes.map((n) => [n.id, n]))
   const machines: Placement[] = []
   for (const node of plan.nodes) {
     if (node.kind === 'source' || node.kind === 'sink') continue
@@ -386,7 +432,7 @@ export function solve(
         break
       }
       attempts += 1
-      const result = attempt(level, plan, random)
+      const result = attempt(level, plan, random, limits.routeRetries)
       if (!result.ok) {
         tally[result.stage] += 1
         continue

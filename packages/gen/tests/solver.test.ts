@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest'
 import { simulate, type Level } from '@factory/sim'
 
-import { canonicalPlan, solve, DEFAULT_SEARCH_LIMITS } from '../src/index'
+import { canonicalPlan, generateLevel, solve, DEFAULT_SEARCH_LIMITS } from '../src/index'
 
 function makeLevel(overrides: Partial<Level> = {}): Level {
   return {
@@ -92,6 +92,64 @@ describe('solve', () => {
     const run = () => JSON.stringify(solve(makeLevel(), 42, patient).solutions.map((s) => s.solution))
     const first = run()
     for (let i = 0; i < 3; i += 1) expect(run()).toBe(first)
+  })
+
+  it('stays deterministic once the wiring is retried', () => {
+    // Retrying draws more from the PRNG, so a bug here would show up as a batch
+    // that no longer reproduces from its seed — which §7 forbids.
+    const run = () => JSON.stringify(solve(makeLevel(), 42, { ...patient, routeRetries: 4 }).solutions)
+    const first = run()
+    for (let i = 0; i < 3; i += 1) expect(run()).toBe(first)
+  })
+})
+
+describe('retrying the wiring instead of the placement', () => {
+  /**
+   * 95% of attempts die at routing, and each one discards a placement that was
+   * fine — the machines were down and one belt run could not find a lane.
+   * `routeRetries` re-pairs the ports and re-orders the runs on the same cells.
+   *
+   * These are *instances*, not a monotonicity guarantee. A different retry
+   * count is a different draw from the PRNG, so on any single level the search
+   * can go either way; some levels do worse. The claim that the default is
+   * worth its cost is an aggregate over 200 candidates, and it lives in §4 of
+   * the generation spec where the measurement can be re-run.
+   */
+
+  it('finds a factory on a level that re-placing alone never wires', () => {
+    const level = generateLevel(45)
+    const once = solve(level, 45, { ...DEFAULT_SEARCH_LIMITS, routeRetries: 1, timeoutMs: 30000 })
+    const twice = solve(level, 45, { ...DEFAULT_SEARCH_LIMITS, routeRetries: 2, timeoutMs: 30000 })
+    expect(once.cheapest).toBeNull()
+    expect(twice.cheapest).not.toBeNull()
+    // Placement was never the problem: both spent their whole allowance.
+    expect(once.tally.placement).toBe(0)
+    expect(once.tally.routing).toBeGreaterThan(0)
+  })
+
+  it('reaches a second materially different solution', () => {
+    // The gain concentrates here rather than in raw wins. Acceptance needs two
+    // distinct forms (§5), and the second plan is the machine-dense one, which
+    // is exactly the one placement restarts struggle to wire.
+    const level = generateLevel(47)
+    const once = solve(level, 47, { ...DEFAULT_SEARCH_LIMITS, routeRetries: 1, timeoutMs: 30000 })
+    const twice = solve(level, 47, { ...DEFAULT_SEARCH_LIMITS, routeRetries: 2, timeoutMs: 30000 })
+    expect(once.distinctForms).toBe(1)
+    expect(twice.distinctForms).toBe(2)
+  })
+
+  it('still lets the simulator be the only judge of a win', () => {
+    // Retrying must not smuggle in a layout that routed but does not run.
+    const outcome = solve(generateLevel(47), 47, { ...DEFAULT_SEARCH_LIMITS, routeRetries: 4, timeoutMs: 30000 })
+    for (const found of outcome.solutions) {
+      expect(simulate(generateLevel(47), found.solution).won).toBe(true)
+    }
+  })
+
+  it('treats a retry count below one as one pass, not zero', () => {
+    const outcome = solve(makeLevel(), 1, { ...patient, routeRetries: 0 })
+    expect(outcome.attempts).toBeGreaterThan(0)
+    expect(outcome.tally.routing + outcome.tally.won).toBeGreaterThan(0)
   })
 
   it('finds nothing when the chemistry cannot reach the target', () => {

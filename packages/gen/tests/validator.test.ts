@@ -183,6 +183,7 @@ describe('§4 what a rejection is allowed to claim', () => {
     expect(verdict.bound.maxDepth).toBe(patient.maxDepth)
     expect(verdict.bound.maxPlans).toBe(patient.maxPlans)
     expect(verdict.bound.attemptsPerPlan).toBe(400)
+    expect(verdict.bound.routeRetries).toBe(patient.routeRetries)
     expect(verdict.bound.timeoutMs).toBe(30000)
   })
 })

@@ -50,7 +50,7 @@
         }
       ]
     },
-    "par": 26
+    "par": 21
   },
   {
     "id": "gen-20",
@@ -103,7 +103,7 @@
         }
       ]
     },
-    "par": 24
+    "par": 23
   },
   {
     "id": "gen-25",
@@ -161,6 +161,119 @@
             "plate"
           ],
           "out": "widget"
+        }
+      ]
+    },
+    "par": 23
+  },
+  {
+    "id": "gen-47",
+    "grid": {
+      "width": 6,
+      "height": 6
+    },
+    "sources": [
+      {
+        "pos": [
+          0,
+          0
+        ],
+        "rotation": 0,
+        "emits": "widget"
+      }
+    ],
+    "sinks": [
+      {
+        "pos": [
+          5,
+          4
+        ],
+        "rotation": 0
+      }
+    ],
+    "target": {
+      "type": "ingot",
+      "count": 5
+    },
+    "max_ticks": 300,
+    "available": [
+      "conveyor",
+      "press",
+      "assembler",
+      "splitter"
+    ],
+    "recipes": {
+      "press": {
+        "widget": "gear"
+      },
+      "assembler": [
+        {
+          "in": [
+            "gear",
+            "gear"
+          ],
+          "out": "ingot"
+        }
+      ]
+    },
+    "par": 22
+  },
+  {
+    "id": "gen-49",
+    "grid": {
+      "width": 7,
+      "height": 7
+    },
+    "sources": [
+      {
+        "pos": [
+          0,
+          1
+        ],
+        "rotation": 0,
+        "emits": "ingot"
+      },
+      {
+        "pos": [
+          0,
+          2
+        ],
+        "rotation": 0,
+        "emits": "cog"
+      }
+    ],
+    "sinks": [
+      {
+        "pos": [
+          6,
+          5
+        ],
+        "rotation": 0
+      }
+    ],
+    "target": {
+      "type": "gadget",
+      "count": 5
+    },
+    "max_ticks": 300,
+    "available": [
+      "conveyor",
+      "press",
+      "assembler",
+      "splitter",
+      "merger"
+    ],
+    "recipes": {
+      "press": {
+        "ingot": "gear"
+      },
+      "assembler": [
+        {
+          "in": [
+            "gear",
+            "gear"
+          ],
+          "out": "gadget"
         }
       ]
     },

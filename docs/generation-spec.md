@@ -1,4 +1,4 @@
-# Generation and Validation — Spec v0.2
+# Generation and Validation — Spec v0.3
 
 **Purpose.** Defines what the generator proposes, what the validator checks, and — most importantly — what the validator is allowed to *claim*. This document is authoritative for `packages/gen/` the way `rules-spec.md` is for `packages/sim/`.
 
@@ -96,15 +96,15 @@ Random restarts are cheap but wasteful. On level 001, roughly **1.5% of attempts
 
 | Outcome | Count | Claim |
 |---|---|---|
-| accepted | 3 | — |
-| `no_placement_found` | 17 | bounded (attempt cap) |
-| `single_solution` | 15 | bounded |
+| accepted | 5 | — |
+| `no_placement_found` | 18 | bounded (attempt cap) |
+| `single_solution` | 13 | bounded |
 | `unsolvable_chemistry` | 6 | **proven** |
 | `insufficient_fanout` | 5 | **proven** |
-| `over_budget` | 4 | bounded |
+| `over_budget` | 3 | bounded |
 | `no_plan_within_depth` | 0 | bounded (plan caps) |
 
-`no_placement_found` dominating is the signal that **the search, not the chemistry, is now the limit**. Of 16,500 attempts, 15,667 (95.0%) died at routing and 833 (5.0%) won; **not one** failed at placement, at port geometry, or at simulation. The bottleneck is entirely geometric — machines land where belts cannot reach them — which is the shape of a systematic problem rather than bad luck.
+`no_placement_found` dominating is the signal that **the search, not the chemistry, is now the limit**. Of 16,500 attempts, 15,638 (94.8%) died at routing and 862 (5.2%) won; **not one** failed at placement, at port geometry, or at simulation. The bottleneck is entirely geometric — machines land where belts cannot reach them — which is the shape of a systematic problem rather than bad luck.
 
 `no_plan_within_depth` scoring zero is worth recording rather than hiding: every candidate whose enumerator came up empty turned out to be provably fan-out-infeasible, so the planner's depth cap was never the binding constraint on this batch. The code stays, because that is a fact about these fifty candidates and not a guarantee about the next fifty.
 
@@ -114,13 +114,43 @@ Two tuning changes were measured against this batch. Varying the order belts are
 
 (Both numbers predate the code split, when a single `no_solution_found` covered what is now `insufficient_fanout`, `no_plan_within_depth` and `no_placement_found`. The five fan-out candidates were in every one of those counts and never reached the search, so the deltas the measurements report are unaffected.)
 
+### Retrying the wiring rather than the placement
+
+The third tuning change, and the first one measured properly enough to trust.
+
+Since 95% of attempts die at routing, every one of those discards a placement that was *fine* — the machines were down, and one belt run could not find a lane. `routeRetries` re-pairs the ports and re-orders the belt runs on the same cells before giving up on them. Wiring is far cheaper to redo than finding somewhere new to put a factory.
+
+Fifty candidates is too small a sample to settle a change that moves acceptance by two or three, and varying a search parameter reshuffles the whole PRNG stream, so an arm can look better for no reason. Measured instead over **200 candidates across four independent seed ranges**, paired by range:
+
+| accepted / 50 | R=1 | R=2 | R=4 |
+|---|---:|---:|---:|
+| seeds 1–50 | 3 | 5 | 6 |
+| seeds 101–150 | 4 | 7 | 6 |
+| seeds 201–250 | 3 | 5 | 4 |
+| seeds 301–350 | 0 | 6 | 7 |
+| **total** | **10** | **23** | **23** |
+
+R=2 wins in all four ranges. R=4 ties it on acceptance and costs 40% more wall clock, so the default is **2**.
+
+The gain is not where you would guess, and this is the part worth keeping:
+
+| across 200 candidates | R=1 | R=2 |
+|---|---:|---:|
+| winning attempts | 6891 | 7173 (+4%) |
+| levels with ≥1 solution | 105 | 110 (+5%) |
+| levels with ≥2 distinct forms | 10 | 23 (**+130%**) |
+
+Retrying barely wins more often. It wins on the **second** plan — the machine-dense one, which needs more belt runs through a grid that is already fuller, and is therefore precisely the layout that placement restarts alone almost never wire. Criterion 4 needs two materially different solutions, so acceptance was being gated not by whether a puzzle *has* two ideas but by whether the router could ever realise the harder one.
+
+It also tightened `par`, which matters more than the acceptance rate does. Par is the cheapest solution *found* (§2), so a weak search ships a generous one: `gen-1` went from 26 to **21** and `gen-20` from 24 to 23 on the same levels. The old numbers were beatable without trying. A better search does not just accept more puzzles, it scores the ones it accepts more honestly.
+
 All three accepted levels share the same shape — an assembler consuming two of one item — because that is what creates the press-then-split versus split-then-press choice. Criterion 4 is therefore selecting for level 001's structure, which is reassuring and also a limitation: the generator currently has one way of making a puzzle interesting.
 
 The honest summary is that this search finds *a* solution often enough to judge a level, and is nowhere near exhaustive. Every claim it makes is scoped accordingly.
 
 ### The bound, and what it lets us say
 
-Stage C is bounded by a plan cap, a placement cap, and a wall-clock timeout, all recorded per candidate. This matters for honesty:
+Stage C is bounded by two plan caps, a placement cap, a wiring-retry cap, and a wall-clock timeout, all recorded per candidate. This matters for honesty:
 
 - Stage A rejecting means **provably unsolvable** — no arrangement of anything could help. Code: `unsolvable_chemistry`.
 - Stage B rejecting means **provably unsolvable** too, for a different reason: either the cheapest conceivable machine set already blows the budget (`over_budget_floor`), or the target needs a fan-out the level has no splitter for (`insufficient_fanout`).
@@ -173,8 +203,8 @@ One JSON object per candidate, one per line (JSONL), appended as the batch runs 
   "cheapest_cost": 14,
   "floor_cost": 8,
   "par": null,
-  "bound": { "maxDepth": 4, "maxPlans": 40, "attemptsPerPlan": 250, "timeoutMs": 4000,
-             "plansTried": 2, "attempts": 500, "exhausted": true },
+  "bound": { "maxDepth": 4, "maxPlans": 40, "attemptsPerPlan": 250, "routeRetries": 2,
+             "timeoutMs": 4000, "plansTried": 2, "attempts": 500, "exhausted": true },
   "tally": { "placement": 0, "ports": 0, "routing": 498, "simulation": 0, "won": 2 }
 }
 ```
@@ -233,3 +263,11 @@ The simulator contributes no randomness (CLAUDE.md), so this reduces to: the gen
 | 12 | Plan caps in the log | `maxDepth` and `maxPlans` recorded in `bound`, so a plan-bounded verdict is arguable from the log line |
 
 Decision 10 changes which candidates are accepted only in the sense that it moves five rejections from a bounded code to a proven one — the same five candidates were already rejected. Decisions 11 and 12 change nothing about acceptance at all. The batch was re-run after all three, per the note above.
+
+**Amended 5 Aug 2026 (v0.3).** One change, and unlike the v0.2 batch it does move which candidates pass:
+
+| # | Decision | Choice |
+|---|---|---|
+| 13 | `routeRetries` | **2** — wiring passes per placement before the placement is abandoned, recorded in `bound` (§4) |
+
+Chosen by measurement over 200 candidates, not by argument; 1 reproduces the previous behaviour exactly and 4 was no better for 40% more clock. Accepted went 3 → 5 on the canonical batch, and two accepted levels had their par tightened, `gen-1` from 26 to 21. Re-run the batch after changing it — par is a function of how hard the search looked.

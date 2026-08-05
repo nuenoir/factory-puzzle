@@ -71,6 +71,30 @@ $mutations = @(
     from = 'const plans = enumeratePlans(level, limits)'
     to   = 'const plans = enumeratePlans(level)'
     kills = 'threading the plan caps into the search that reports them'
+  },
+  @{
+    file = 'packages/gen/src/solver.ts'
+    from = 'for (let retry = 0; retry < Math.max(1, retries); retry += 1) {'
+    to   = 'for (let retry = 0; retry < 1; retry += 1) {'
+    kills = 'retrying the wiring at all'
+  },
+  @{
+    file = 'packages/gen/src/solver.ts'
+    from = 'Math.max(1, retries)'
+    to   = 'retries'
+    kills = 'guarding against a retry count of zero'
+  },
+  @{
+    file = 'packages/gen/src/solver.ts'
+    from = 'const result = attempt(level, plan, random, limits.routeRetries)'
+    to   = 'const result = attempt(level, plan, random, 1)'
+    kills = 'honouring the configured retry count'
+  },
+  @{
+    file = 'packages/gen/src/solver.ts'
+    from = "    if (wired.stage === 'ports') break"
+    to   = ''
+    kills = 'breaking early on a failure that cannot differ between passes'
   }
 )
 
