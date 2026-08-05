@@ -144,6 +144,31 @@ Retrying barely wins more often. It wins on the **second** plan — the machine-
 
 It also tightened `par`, which matters more than the acceptance rate does. Par is the cheapest solution *found* (§2), so a weak search ships a generous one: `gen-1` went from 26 to **21** and `gen-20` from 24 to 23 on the same levels. The old numbers were beatable without trying. A better search does not just accept more puzzles, it scores the ones it accepts more honestly.
 
+### Rip-up and re-route — measured, and rejected
+
+The obvious next step after that, and it does not work. Recorded here because a negative result is the evidence against the next person's obvious idea, and this one is *more* useful than the change that succeeded.
+
+Where `routeRetries` reshuffles the belt order and hopes, rip-up uses the failure: the run that could not find a lane is torn out along with everything else and promoted to route **first** next time, forcing the runs that walled it in to find their own way around. The bound is structural rather than a tuning knob — a run is promoted at most once, so the work cannot exceed one pass per belt run. It was implemented behind a switch, verified neutral when off, and measured with the same paired protocol over 200 candidates.
+
+| accepted / 200 | R=1 | R=2 | R=4 |
+|---|---:|---:|---:|
+| plain | 10 | **23** | 23 |
+| with rip-up | 11 | 22 | 25 |
+
+Against the R=2 default it is a *regression* — 23 to 22, one seed range worse and three tied — for 20% more wall clock. R=4 with rip-up reaches 25, but that is two more candidates out of 200 for nearly double the clock, and paired it is two wins, one loss and one tie. Nothing here is worth the code, so the implementation was reverted.
+
+**Why it fails is the useful part**, and it is one row of the table:
+
+| across 200 candidates | R=1 | R=1 + rip-up | R=2 | R=2 + rip-up |
+|---|---:|---:|---:|---:|
+| routing failures | 52,359 | 52,289 | 52,077 | 52,001 |
+
+A 0.7% change. If belt runs were walling each other in, promoting the blocked run would have cut that number hard; it barely moves. So the routing failures are **not ordering conflicts at all** — they are bad placements that only reveal themselves at routing time, and no ordering rescues a machine boxed into a corner.
+
+This corrects the reading of the tally in the observed-behaviour section above. "94.8% of attempts die at routing" invites the conclusion that the router is the weak component. It is not: the router is close to optimal given where the machines are, and *placement* is the thing to improve. The tally records the stage at which an attempt was abandoned, which is not the same as the stage that caused it — a distinction worth keeping in mind before optimising anything else on the strength of that column.
+
+It also suggests why `routeRetries` worked despite the same diagnosis, though this part is inference from the code rather than something measured. A retry calls `shufflePortPairing` again and the machine rotations are derived from the pairing, so a retry can change the *geometry* — which ports face where — and not merely the order runs are laid in. Rip-up changes the order alone, within a single pairing. If that is the whole story then the gain belongs to the re-pairing and the reshuffle is incidental, but separating the two would take another paired run and has not been done.
+
 All three accepted levels share the same shape — an assembler consuming two of one item — because that is what creates the press-then-split versus split-then-press choice. Criterion 4 is therefore selecting for level 001's structure, which is reassuring and also a limitation: the generator currently has one way of making a puzzle interesting.
 
 The honest summary is that this search finds *a* solution often enough to judge a level, and is nowhere near exhaustive. Every claim it makes is scoped accordingly.

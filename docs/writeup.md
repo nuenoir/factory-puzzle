@@ -151,6 +151,31 @@ Retrying the wiring barely wins more often. It wins on the **second** solution. 
 
 **The part I care about more than the acceptance rate.** Par is the cheapest solution *found*, which means a weak search ships a generous one. Two of the already-accepted levels had their par tightened by the same change: `gen-1` from 26 down to **21**, `gen-20` from 24 to 23. Those puzzles were shipping a par you could beat without trying, and nothing in the pipeline would have flagged it — the level was accepted, the par was verified, the number was just *loose*. A better search doesn't only accept more puzzles. It scores the ones it already accepted more honestly, and that's the failure mode I'd least like to have shipped.
 
+## The one that didn't work, and taught me more
+
+The obvious next step was a proper rip-up-and-reroute, the standard trick from circuit routing. Instead of reshuffling and hoping, use the failure: tear out everything and lay the run that got stuck *first*, forcing the runs that blocked it to find their own way around. Each run gets promoted at most once, so it's bounded by the number of runs rather than by a number I'd have to invent.
+
+Same measurement protocol, 200 candidates, four seed ranges:
+
+| accepted / 200 | 1 pass | 2 passes | 4 passes |
+|---|---:|---:|---:|
+| plain | 10 | **23** | 23 |
+| with rip-up | 11 | 22 | 25 |
+
+Against the shipping default it's a *regression* — 23 to 22 — for 20% more wall clock. I reverted it.
+
+The reason is one row I nearly didn't look at:
+
+| across 200 candidates | 1 pass | + rip-up | 2 passes | + rip-up |
+|---|---:|---:|---:|---:|
+| routing failures | 52,359 | 52,289 | 52,077 | 52,001 |
+
+**0.7%.** If belt runs were blocking each other, promoting the blocked one would have cut that number hard. It doesn't move. So the routing failures aren't ordering conflicts at all — they're bad *placements* that happen to reveal themselves at routing time. No ordering rescues a machine boxed into a corner.
+
+Which means I'd been misreading my own instrument. "94.8% of attempts die at routing" reads as *the router is the weak component*. It isn't — the router is close to optimal given where the machines are. The tally records the stage at which an attempt was **abandoned**, and that is not the stage that **caused** it. I'd been pointing at the wrong half of the pipeline for two rounds of work, and the only reason I found out is that I measured a change I expected to succeed.
+
+That's the argument for keeping negative results, and it's stronger than the usual one. This experiment didn't just fail to help — it invalidated the reading I'd have used to justify the next three things I tried.
+
 ## What surprised me
 
 **Twice, a bug looked like bad luck.** Early on, every single placement attempt failed to route — 1000 out of 1000. A random search failing 100% of the time isn't unlucky, it's broken. The cause was that I paired the splitter's two outputs to the assembler's two inputs in index order, which made the two belt runs cross. A hex grid has no crossings, so nothing could ever route. The real solution uses the opposite pairing.
@@ -169,7 +194,7 @@ Fixing that exposed a second one: one plan had a single source feeding two press
 
 The search is bounded and nowhere near exhaustive. It finds *a* solution often enough to judge a level — about 5% of attempts succeed — and its silence is never evidence of impossibility.
 
-The 10% acceptance rate is still low, and 36% of candidates fail in placement rather than chemistry. The retry change bought a lot and the remaining ceiling is the same one: 94.8% of attempts still die at routing. The next thing I'd try is letting the router rip up a blocking belt run and re-lay it rather than failing the pass, which is a real search rather than the reshuffle-and-hope this one is. I'd measure it the same way, over 200 candidates paired by seed range, because that's the only reason I know the last change worked.
+The 10% acceptance rate is still low, and 36% of candidates fail in placement rather than chemistry. The rip-up result above says where the remaining ceiling actually is, and it isn't the router: it's the placement heuristic, which currently drops each machine into a corridor between source and sink with a bit of jitter and no notion of leaving room for the belts that have to reach it. Something that reserves lanes while placing — or simply scores a candidate placement by how much free space surrounds its ports before committing — is the honest next thing. Same protocol, and I'd expect to be wrong about half the time.
 
 All five accepted puzzles share the same shape — an assembler consuming two of one item — because that's the only structure the generator currently has for creating a real choice. Criterion 4 is faithfully selecting for it, which is both reassuring and a ceiling. The fan-out check sharpens that observation into something slightly uncomfortable: the generator's one interesting shape is also the one that's impossible without a splitter, and it withholds the splitter 25% of the time. Five of the fifty candidates were doomed at the moment they were proposed.
 
