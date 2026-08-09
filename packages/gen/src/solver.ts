@@ -15,6 +15,7 @@
 import {
   DIRECTIONS,
   ROTATIONS,
+  neighbourOf,
   portsFor,
   simulate,
   type Direction,
@@ -43,7 +44,16 @@ import {
  * why `no_plan_within_depth` and `no_placement_found` are separate verdicts.
  */
 export interface SearchLimits extends PlanLimits {
-  /** Random restarts tried per plan. Each one places every machine afresh. */
+  /**
+   * Random restarts tried per plan. Each one places every machine afresh.
+   *
+   * Restarts alternate between taking the first free cell and sampling for
+   * room (see `placementSamples`), so this is split evenly between the two and
+   * 500 buys 250 of each. It was 250 when every restart was a tight one; the
+   * roomy half is an addition rather than a reallocation, because taking the
+   * budget away from tight placements loses the cheap compact solutions and
+   * `par` drifts up with them.
+   */
   readonly attemptsPerPlan: number
   /**
    * Wiring passes per placement before the placement itself is abandoned.
@@ -61,14 +71,30 @@ export interface SearchLimits extends PlanLimits {
    * would expect it.
    */
   readonly routeRetries: number
+  /**
+   * Free cells to consider for each machine before choosing where it goes.
+   *
+   * The corridor says roughly *where* a machine belongs; this decides which of
+   * several acceptable cells it actually takes. 1 grabs the first free cell the
+   * jitter lands on, which is what the search did originally and which happily
+   * wedges a machine into a corner its belts can never reach.
+   *
+   * Measured over 200 candidates in four paired seed ranges, against a control
+   * given the same 500-restart budget with the heuristic off: accepted 20 → 31
+   * and mean par excess 0.500 → 0.406. The control matters — doubling the
+   * budget on its own moved acceptance 23 → 20, which is how noisy that number
+   * is. 6 and 8 samples are no better than 4. See §4.
+   */
+  readonly placementSamples: number
   /** Wall-clock ceiling for the whole search. */
   readonly timeoutMs: number
 }
 
 export const DEFAULT_SEARCH_LIMITS: SearchLimits = {
   ...DEFAULT_PLAN_LIMITS,
-  attemptsPerPlan: 250,
+  attemptsPerPlan: 500,
   routeRetries: 2,
+  placementSamples: 4,
   timeoutMs: 4000,
 }
 
@@ -228,6 +254,25 @@ function depthsOf(plan: Plan): Map<number, number> {
 
 const key = (p: PosTuple) => `${p[0]},${p[1]}`
 
+/**
+ * How many of a cell's six neighbours a belt could still come in through.
+ *
+ * A crude proxy for whether the wiring will be able to reach this machine, and
+ * crude on purpose: at placement time the rotations are not chosen yet, so
+ * which ports face where is unknown. What is known is that a machine with one
+ * free neighbour has at most one connection available however it is turned,
+ * and the plans here need two or three.
+ */
+function elbowRoom(pos: PosTuple, grid: Level['grid'], taken: ReadonlySet<string>): number {
+  let free = 0
+  for (const d of DIRECTIONS) {
+    const n = neighbourOf(pos[0], pos[1], d)
+    if (n.x < 0 || n.y < 0 || n.x >= grid.width || n.y >= grid.height) continue
+    if (!taken.has(`${n.x},${n.y}`)) free += 1
+  }
+  return free
+}
+
 /** Ports of a placed node, honouring the level's fixed source/sink rotations. */
 function portsOf(node: PlanNode, level: Level, rotation: Rotation) {
   if (node.kind === 'source') {
@@ -246,7 +291,13 @@ type AttemptResult =
  * Try to realise one plan as a real layout. Succeeds only when `simulate` says
  * the factory wins — routing successfully is not the same as working.
  */
-function attempt(level: Level, plan: Plan, random: () => number, retries: number): AttemptResult {
+function attempt(
+  level: Level,
+  plan: Plan,
+  random: () => number,
+  retries: number,
+  samples: number,
+): AttemptResult {
   const { width, height } = level.grid
   const depths = depthsOf(plan)
   const maxDepth = Math.max(1, ...depths.values())
@@ -274,14 +325,26 @@ function attempt(level: Level, plan: Plan, random: () => number, retries: number
     const idealX = t * (width - 1)
     const idealY = startRow + (endRow - startRow) * t
 
-    let placed: PosTuple | null = null
-    for (let tries = 0; tries < 40 && placed === null; tries += 1) {
+    // Collect a few acceptable cells rather than seizing the first one. With
+    // one sample this stops at the first free cell and consumes the random
+    // stream exactly as the original did.
+    const wanted = Math.max(1, samples)
+    const candidates: PosTuple[] = []
+    for (let tries = 0; tries < 40 && candidates.length < wanted; tries += 1) {
       const spread = 1 + tries / 12 // widen the net if the neighbourhood is full
       const x = clamp(Math.round(idealX + (random() * 2 - 1) * (1 + spread)), 0, width - 1)
       const y = clamp(Math.round(idealY + (random() * 2 - 1) * (1 + spread)), 0, height - 1)
-      if (!taken.has(key([x, y]))) placed = [x, y]
+      if (!taken.has(key([x, y]))) candidates.push([x, y])
     }
-    if (placed === null) return { ok: false, stage: 'placement' }
+    if (candidates.length === 0) return { ok: false, stage: 'placement' }
+
+    // Prefer the cell with the most room around it. Strictly greater, so ties
+    // keep the earliest candidate — and the jitter widens as it goes, which
+    // means an early candidate is the one nearest the corridor. Room only wins
+    // when it is genuinely more room.
+    const placed = candidates.reduce((best, cell) =>
+      elbowRoom(cell, level.grid, taken) > elbowRoom(best, level.grid, taken) ? cell : best,
+    )
     taken.add(key(placed))
     cells.set(node.id, placed)
   }
@@ -432,7 +495,13 @@ export function solve(
         break
       }
       attempts += 1
-      const result = attempt(level, plan, random, limits.routeRetries)
+      // Alternate tight and roomy placements. Preferring free neighbours finds
+      // more layouts but spreads the machines, and spread machines need longer
+      // belts — so a search that only ever samples for room stops finding the
+      // cheap compact solutions, and `par` drifts upward. Every other restart
+      // takes the first cell it lands on, which is what keeps those in reach.
+      const samples = i % 2 === 0 ? 1 : limits.placementSamples
+      const result = attempt(level, plan, random, limits.routeRetries, samples)
       if (!result.ok) {
         tally[result.stage] += 1
         continue

@@ -1,4 +1,4 @@
-# Generation and Validation — Spec v0.3
+# Generation and Validation — Spec v0.4
 
 **Purpose.** Defines what the generator proposes, what the validator checks, and — most importantly — what the validator is allowed to *claim*. This document is authoritative for `packages/gen/` the way `rules-spec.md` is for `packages/sim/`.
 
@@ -96,15 +96,17 @@ Random restarts are cheap but wasteful. On level 001, roughly **1.5% of attempts
 
 | Outcome | Count | Claim |
 |---|---|---|
-| accepted | 5 | — |
-| `no_placement_found` | 18 | bounded (attempt cap) |
-| `single_solution` | 13 | bounded |
+| accepted | 7 | — |
+| `single_solution` | 16 | bounded |
+| `no_placement_found` | 8 | bounded (attempt cap) |
+| `over_budget` | 8 | bounded |
 | `unsolvable_chemistry` | 6 | **proven** |
 | `insufficient_fanout` | 5 | **proven** |
-| `over_budget` | 3 | bounded |
 | `no_plan_within_depth` | 0 | bounded (plan caps) |
 
-`no_placement_found` dominating is the signal that **the search, not the chemistry, is now the limit**. Of 16,500 attempts, 15,638 (94.8%) died at routing and 862 (5.2%) won; **not one** failed at placement, at port geometry, or at simulation. The bottleneck is entirely geometric — machines land where belts cannot reach them — which is the shape of a systematic problem rather than bad luck.
+Of 33,000 attempts, 30,734 (93.1%) died at routing and 2,266 (6.9%) won; **not one** failed at placement, at port geometry, or at simulation. Those three zeroes have held across every batch, and they say the failures are geometric — machines landing where belts cannot reach them — rather than logical.
+
+`single_solution` is now the largest rejection class, having overtaken `no_placement_found` as the search improved. That is a meaningful change of regime: the limit is no longer mostly "cannot find a layout" but "this puzzle genuinely has one idea in it", which is a fact about the generator's output rather than about the search. Note also that `over_budget` rose from 3 to 8 — a stronger search finds solutions for levels that previously found none, and some of those turn out to be expensive. A rejection moving from `no_placement_found` to `over_budget` is the log becoming more truthful, not the generator getting worse.
 
 `no_plan_within_depth` scoring zero is worth recording rather than hiding: every candidate whose enumerator came up empty turned out to be provably fan-out-infeasible, so the planner's depth cap was never the binding constraint on this batch. The code stays, because that is a fact about these fifty candidates and not a guarantee about the next fifty.
 
@@ -168,6 +170,33 @@ A 0.7% change. If belt runs were walling each other in, promoting the blocked ru
 This corrects the reading of the tally in the observed-behaviour section above. "94.8% of attempts die at routing" invites the conclusion that the router is the weak component. It is not: the router is close to optimal given where the machines are, and *placement* is the thing to improve. The tally records the stage at which an attempt was abandoned, which is not the same as the stage that caused it — a distinction worth keeping in mind before optimising anything else on the strength of that column.
 
 It also suggests why `routeRetries` worked despite the same diagnosis, though this part is inference from the code rather than something measured. A retry calls `shufflePortPairing` again and the machine rotations are derived from the pairing, so a retry can change the *geometry* — which ports face where — and not merely the order runs are laid in. Rip-up changes the order alone, within a single pairing. If that is the whole story then the gain belongs to the re-pairing and the reshuffle is incidental, but separating the two would take another paired run and has not been done.
+
+### Placing machines where belts can reach them
+
+The change the rip-up result pointed at, and it works.
+
+Placement used to take the first free cell the jitter landed on. That happily wedges a machine into a corner with one free neighbour, which cannot be wired however it is rotated. Now each machine considers up to `placementSamples` free cells and takes the one with the most free neighbours — a crude proxy, deliberately so, since rotations are not chosen until later and all that is really knowable at placement time is whether anything can get in at all.
+
+Two details carry the result.
+
+**Restarts alternate.** Sampling for room spreads machines out, and spread-out machines need longer belt runs, which cost more — so a search that *only* samples for room stops finding the cheap compact layouts and `par` drifts upward with them. Measured: pure roomy sampling took acceptance from 23 to 31 while making par looser on 39 levels against 14 tighter. Acceptance and par honesty moved in opposite directions, and par is the number the player is scored against. Even-numbered restarts now take the first free cell and odd ones sample, so both regimes stay in reach.
+
+**The roomy half is an addition, not a reallocation.** Splitting the existing 250 restarts into 125 of each kept par honest but bought only two more acceptances. `attemptsPerPlan` therefore rises to 500 — 250 tight plus 250 roomy — so the compact search keeps the budget it always had.
+
+That last decision needs a control, because it changes two things at once. All four arms over 200 candidates in four paired seed ranges:
+
+| | accepted /200 | mean par excess | levels off best | ms |
+|---|---:|---:|---:|---:|
+| 250 tight *(before)* | 23 | 0.953 | 31 | 4711 |
+| 500 tight *(budget control)* | 20 | 0.500 | 16 | 9187 |
+| 125 tight + 125 roomy | 25 | 0.877 | 42 | 5807 |
+| **250 tight + 250 roomy** | **31** | **0.406** | 23 | 11554 |
+
+*Par excess* is how far an arm's reported par sits above the cheapest cost any arm found for that level, over the levels every arm solved. Lower is a tighter, more honest par.
+
+Against the control — same 500-restart budget, heuristic off — the heuristic takes acceptance from 20 to 31 and par excess from 0.500 to 0.406. It wins on both axes with the budget held constant, which is the comparison that licenses the change.
+
+**The control also shows how noisy acceptance is.** Doubling the budget on its own moved it *down*, 23 to 20, because a changed restart count reshuffles the entire PRNG stream. Swings of ±3 mean nothing. This is the third search change in a row where the single canonical batch would have given the wrong answer, and it is why every one of them is measured across four ranges paired.
 
 All three accepted levels share the same shape — an assembler consuming two of one item — because that is what creates the press-then-split versus split-then-press choice. Criterion 4 is therefore selecting for level 001's structure, which is reassuring and also a limitation: the generator currently has one way of making a puzzle interesting.
 
@@ -296,3 +325,13 @@ Decision 10 changes which candidates are accepted only in the sense that it move
 | 13 | `routeRetries` | **2** — wiring passes per placement before the placement is abandoned, recorded in `bound` (§4) |
 
 Chosen by measurement over 200 candidates, not by argument; 1 reproduces the previous behaviour exactly and 4 was no better for 40% more clock. Accepted went 3 → 5 on the canonical batch, and two accepted levels had their par tightened, `gen-1` from 26 to 21. Re-run the batch after changing it — par is a function of how hard the search looked.
+
+**Amended 5 Aug 2026 (v0.4).** Placement, following the rip-up finding that routing failures are really placement failures:
+
+| # | Decision | Choice |
+|---|---|---|
+| 14 | `placementSamples` | **4** — consider four free cells per machine and take the one with the most free neighbours (§4) |
+| 15 | Alternating restarts | Even restarts place tight, odd restarts sample for room, so `par` keeps access to compact layouts |
+| 16 | `attemptsPerPlan` | **250 → 500**, so the roomy half is an addition rather than a reallocation |
+
+Accepted went 5 → 7 on the canonical batch. Four of the five previously accepted levels kept their par exactly; `gen-49` slipped by one, from 23 to 24, which is a single-level loss against a clear aggregate gain and is recorded rather than smoothed over. Batch time 1.4s → 2.5s.

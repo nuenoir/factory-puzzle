@@ -106,6 +106,58 @@
     "par": 23
   },
   {
+    "id": "gen-21",
+    "grid": {
+      "width": 6,
+      "height": 6
+    },
+    "sources": [
+      {
+        "pos": [
+          0,
+          2
+        ],
+        "rotation": 0,
+        "emits": "ore"
+      }
+    ],
+    "sinks": [
+      {
+        "pos": [
+          5,
+          1
+        ],
+        "rotation": 0
+      }
+    ],
+    "target": {
+      "type": "plate",
+      "count": 5
+    },
+    "max_ticks": 300,
+    "available": [
+      "conveyor",
+      "press",
+      "assembler",
+      "splitter"
+    ],
+    "recipes": {
+      "press": {
+        "ore": "widget"
+      },
+      "assembler": [
+        {
+          "in": [
+            "widget",
+            "widget"
+          ],
+          "out": "plate"
+        }
+      ]
+    },
+    "par": 22
+  },
+  {
     "id": "gen-25",
     "grid": {
       "width": 6,
@@ -165,6 +217,66 @@
       ]
     },
     "par": 23
+  },
+  {
+    "id": "gen-29",
+    "grid": {
+      "width": 5,
+      "height": 5
+    },
+    "sources": [
+      {
+        "pos": [
+          0,
+          3
+        ],
+        "rotation": 0,
+        "emits": "plate"
+      },
+      {
+        "pos": [
+          0,
+          4
+        ],
+        "rotation": 0,
+        "emits": "gear"
+      }
+    ],
+    "sinks": [
+      {
+        "pos": [
+          4,
+          4
+        ],
+        "rotation": 0
+      }
+    ],
+    "target": {
+      "type": "rod",
+      "count": 5
+    },
+    "max_ticks": 300,
+    "available": [
+      "conveyor",
+      "press",
+      "assembler",
+      "splitter"
+    ],
+    "recipes": {
+      "press": {
+        "plate": "ore"
+      },
+      "assembler": [
+        {
+          "in": [
+            "ore",
+            "ore"
+          ],
+          "out": "rod"
+        }
+      ]
+    },
+    "par": 25
   },
   {
     "id": "gen-47",
@@ -277,6 +389,6 @@
         }
       ]
     },
-    "par": 23
+    "par": 24
   }
 ]

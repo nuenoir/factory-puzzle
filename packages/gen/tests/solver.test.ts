@@ -114,12 +114,20 @@ describe('retrying the wiring instead of the placement', () => {
    * can go either way; some levels do worse. The claim that the default is
    * worth its cost is an aggregate over 200 candidates, and it lives in §4 of
    * the generation spec where the measurement can be re-run.
+   *
+   * They pin `placementSamples: 1` deliberately. These test what retrying the
+   * *wiring* buys, so every other part of the search is held still — an earlier
+   * version inherited whatever the default happened to be, and duly broke when
+   * the placement heuristic improved enough to solve these levels on the first
+   * pass. That was the test being wrong, not the code: a test for one mechanism
+   * should not quietly depend on the tuning of another.
    */
+  const wiringOnly = { ...DEFAULT_SEARCH_LIMITS, placementSamples: 1, attemptsPerPlan: 250, timeoutMs: 30000 }
 
   it('finds a factory on a level that re-placing alone never wires', () => {
     const level = generateLevel(45)
-    const once = solve(level, 45, { ...DEFAULT_SEARCH_LIMITS, routeRetries: 1, timeoutMs: 30000 })
-    const twice = solve(level, 45, { ...DEFAULT_SEARCH_LIMITS, routeRetries: 2, timeoutMs: 30000 })
+    const once = solve(level, 45, { ...wiringOnly, routeRetries: 1 })
+    const twice = solve(level, 45, { ...wiringOnly, routeRetries: 2 })
     expect(once.cheapest).toBeNull()
     expect(twice.cheapest).not.toBeNull()
     // Placement was never the problem: both spent their whole allowance.
@@ -132,8 +140,8 @@ describe('retrying the wiring instead of the placement', () => {
     // distinct forms (§5), and the second plan is the machine-dense one, which
     // is exactly the one placement restarts struggle to wire.
     const level = generateLevel(47)
-    const once = solve(level, 47, { ...DEFAULT_SEARCH_LIMITS, routeRetries: 1, timeoutMs: 30000 })
-    const twice = solve(level, 47, { ...DEFAULT_SEARCH_LIMITS, routeRetries: 2, timeoutMs: 30000 })
+    const once = solve(level, 47, { ...wiringOnly, routeRetries: 1 })
+    const twice = solve(level, 47, { ...wiringOnly, routeRetries: 2 })
     expect(once.distinctForms).toBe(1)
     expect(twice.distinctForms).toBe(2)
   })
@@ -150,6 +158,66 @@ describe('retrying the wiring instead of the placement', () => {
     const outcome = solve(makeLevel(), 1, { ...patient, routeRetries: 0 })
     expect(outcome.attempts).toBeGreaterThan(0)
     expect(outcome.tally.routing + outcome.tally.won).toBeGreaterThan(0)
+  })
+})
+
+describe('choosing a roomier cell rather than the first free one', () => {
+  /**
+   * Rip-up routing proved that routing failures are not ordering conflicts —
+   * they are machines placed where no belt can reach them. Considering a few
+   * cells and taking the one with the most free neighbours is the fix that
+   * follows, and it is the change that finally moved the routing-failure count
+   * (6.1%, against rip-up's 0.7%). Aggregate numbers are in §4.
+   *
+   * As with the retry tests these are instances. Sampling changes the random
+   * stream, so individual levels can go either way and some do worse; the two
+   * chosen here have wide margins so they are testing the mechanism rather than
+   * a coin flip.
+   */
+  // Budget pinned as well as the retry count. These compare one knob, so every
+  // other one is held still — the same mistake broke the wiring tests above
+  // when the placement heuristic landed, and then broke these when the restart
+  // budget doubled to pay for it.
+  const roomy = { ...DEFAULT_SEARCH_LIMITS, attemptsPerPlan: 250, routeRetries: 2, timeoutMs: 30000 }
+
+  it('wins far more often on a level where the corner cells are traps', () => {
+    // 164 wins to 205 at the time of writing. The margin is deliberately loose
+    // — only half the restarts sample for room, so the effect is roughly half
+    // what the heuristic alone produces, and this asserts the mechanism rather
+    // than a fixed count the next tuning change would invalidate.
+    const level = generateLevel(41)
+    const first = solve(level, 41, { ...roomy, placementSamples: 1 })
+    const spacious = solve(level, 41, { ...roomy, placementSamples: 4 })
+    expect(first.tally.won).toBeGreaterThan(0) // not a level that was broken anyway
+    expect(spacious.tally.won).toBeGreaterThan(first.tally.won * 1.15)
+  })
+
+  it('reaches a second solution on a level that found none at all', () => {
+    // 0 -> 2 distinct forms, which is the difference between rejected and
+    // accepted. The whole acceptance gain is made of levels like this.
+    const level = generateLevel(21)
+    expect(solve(level, 21, { ...roomy, placementSamples: 1 }).distinctForms).toBe(0)
+    expect(solve(level, 21, { ...roomy, placementSamples: 4 }).distinctForms).toBe(2)
+  })
+
+  it('never reports a placement failure it could have avoided', () => {
+    // Sampling asks for more free cells than it strictly needs, so a bug here
+    // would show up as attempts abandoned at placement — a column that has been
+    // exactly zero across every batch and should stay that way.
+    const outcome = solve(makeLevel(), 7, { ...patient, placementSamples: 8 })
+    expect(outcome.tally.placement).toBe(0)
+  })
+
+  it('treats a sample count below one as one cell, not zero', () => {
+    const outcome = solve(makeLevel(), 1, { ...patient, placementSamples: 0 })
+    expect(outcome.attempts).toBeGreaterThan(0)
+    expect(outcome.tally.placement).toBe(0)
+  })
+
+  it('stays deterministic while sampling', () => {
+    const run = () => JSON.stringify(solve(makeLevel(), 9, { ...patient, placementSamples: 4 }).solutions)
+    const first = run()
+    for (let i = 0; i < 3; i += 1) expect(run()).toBe(first)
   })
 
   it('finds nothing when the chemistry cannot reach the target', () => {

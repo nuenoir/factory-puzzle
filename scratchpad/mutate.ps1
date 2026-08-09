@@ -86,8 +86,8 @@ $mutations = @(
   },
   @{
     file = 'packages/gen/src/solver.ts'
-    from = 'const result = attempt(level, plan, random, limits.routeRetries)'
-    to   = 'const result = attempt(level, plan, random, 1)'
+    from = 'const result = attempt(level, plan, random, limits.routeRetries, samples)'
+    to   = 'const result = attempt(level, plan, random, 1, samples)'
     kills = 'honouring the configured retry count'
   },
   @{
@@ -95,6 +95,30 @@ $mutations = @(
     from = "    if (wired.stage === 'ports') break"
     to   = ''
     kills = 'breaking early on a failure that cannot differ between passes'
+  },
+  @{
+    file = 'packages/gen/src/solver.ts'
+    from = 'const samples = i % 2 === 0 ? 1 : limits.placementSamples'
+    to   = 'const samples = 1'
+    kills = 'sampling for elbow room at all'
+  },
+  @{
+    file = 'packages/gen/src/solver.ts'
+    from = 'const wanted = Math.max(1, samples)'
+    to   = 'const wanted = samples'
+    kills = 'guarding against a sample count of zero'
+  },
+  @{
+    file = 'packages/gen/src/solver.ts'
+    from = 'elbowRoom(cell, level.grid, taken) > elbowRoom(best, level.grid, taken) ? cell : best'
+    to   = 'best'
+    kills = 'actually preferring the roomier of the sampled cells'
+  },
+  @{
+    file = 'packages/gen/src/solver.ts'
+    from = 'if (!taken.has(`${n.x},${n.y}`)) free += 1'
+    to   = 'free += 1'
+    kills = 'counting only the neighbours a belt could really use'
   }
 )
 
