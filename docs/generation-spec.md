@@ -1,4 +1,4 @@
-# Generation and Validation — Spec v0.5
+# Generation and Validation — Spec v0.6
 
 **Purpose.** Defines what the generator proposes, what the validator checks, and — most importantly — what the validator is allowed to *claim*. This document is authoritative for `packages/gen/` the way `rules-spec.md` is for `packages/sim/`.
 
@@ -35,6 +35,8 @@ Varied per candidate:
 | `max_ticks` | 300 | Fixed. `ASSUMPTION` |
 
 **Two routes to the target, sometimes.** The second assembler pair was allowed here from the beginning and went unemitted for months, which quietly capped what the generator could produce: with one recipe the *only* structure able to satisfy criterion 4 is an `x + x` pair plus a splitter, so every accepted puzzle was press-then-split versus split-then-press with the item names changed. It now sometimes offers a second way to reach the target — the other pairing when there are two sources, and otherwise a second way to reach the item the assembler consumes.
+
+**Converging chains** are the other half, and they needed no format change at all. `recipes.press` is keyed by input, so `press[ore] = plate` alongside `press[scrap] = plate` has always been expressible — two chains arriving at the same item. The generator simply never wrote it. It now sometimes routes the second source's chain into the item the first one makes, which hands the assembler a route with **no splitter in it at all** (one chain per port) beside the split-one-chain routes. Those have different machine multisets, so they are different ideas rather than mirrors of each other.
 
 That last case is deliberately *upstream* of the target rather than a shortcut to it. A press straight to the target was the first attempt and it works, in the sense that acceptance rose further; it also means the target no longer needs a fan-out, and `insufficient_fanout` fell from 24 rejections in 200 to 6. Hollowing out a proven rejection class to raise the acceptance rate is the wrong trade, and the shortcut's "choice" was fake anyway — pressing costs 5 against 11 to assemble, so one route dominates and nothing is really being decided.
 
@@ -101,19 +103,19 @@ Random restarts are cheap but wasteful. On level 001, roughly **1.5% of attempts
 
 | Outcome | Count | Claim |
 |---|---|---|
-| accepted | 6 | — |
-| `single_solution` | 17 | bounded |
+| accepted | 7 | — |
+| `single_solution` | 15 | bounded |
 | `over_budget` | 10 | bounded |
 | `no_placement_found` | 7 | bounded (attempt cap) |
-| `insufficient_fanout` | 6 | **proven** |
-| `unsolvable_chemistry` | 4 | **proven** |
+| `unsolvable_chemistry` | 6 | **proven** |
+| `insufficient_fanout` | 5 | **proven** |
 | `no_plan_within_depth` | 0 | bounded (plan caps) |
 
-Of 59,500 attempts, 57,218 (96.2%) died at routing and 2,282 (3.8%) won; **not one** failed at placement, at port geometry, or at simulation. Those three zeroes have held across every batch, and they say the failures are geometric — machines landing where belts cannot reach them — rather than logical.
+Of 65,000 attempts, 62,672 (96.4%) died at routing and 2,328 (3.6%) won; **not one** failed at placement, at port geometry, or at simulation. Those three zeroes have held across every batch, and they say the failures are geometric — machines landing where belts cannot reach them — rather than logical.
 
 `single_solution` is the largest rejection class, having overtaken `no_placement_found` once the search stopped being the limit. That is the change of regime the generator work responds to: the constraint is no longer mostly "cannot find a layout" but "this puzzle has one idea in it".
 
-Read the acceptance count with care. Six is one *fewer* than the seven the previous configuration produced on these same fifty seeds, and it is the right trade: those seven were all the same shape, while these six span four. Over 200 candidates the change is 31 → 36 accepted and 2 → 6 shapes. Fifty candidates cannot resolve a difference of one.
+Read the acceptance count with care, and prefer the shape count to it. Over 200 candidates the generator change is 31 → 42 accepted and **2 → 8 distinct machine shapes**, with the most common shape's share falling from 30-of-31 to 12-of-42. Fifty candidates cannot resolve the acceptance difference; they can show the variety, since these seven span several shapes where the previous seven were all one.
 
 `no_plan_within_depth` scoring zero is worth recording rather than hiding: every candidate whose enumerator came up empty turned out to be provably fan-out-infeasible, so the planner's depth cap was never the binding constraint on this batch. The code stays, because that is a fact about these fifty candidates and not a guarantee about the next fifty.
 
@@ -213,15 +215,18 @@ With the search no longer the limit, `single_solution` became the largest reject
 
 | accepted levels, 200 candidates | one route | alternative routes |
 |---|---:|---:|
-| accepted | 31 | 36 |
-| **distinct machine shapes among them** | **2** | **6** |
-| most common shape's share | 30 of 31 | 12 of 36 |
-| candidates reaching 3+ distinct forms | 0 | 11 |
-| plans enumerated | 237 | 412 |
+| accepted | 31 | 42 |
+| **distinct machine shapes among them** | **2** | **8** |
+| most common shape's share | 30 of 31 | 12 of 42 |
+| candidates reaching 3+ distinct forms | 0 | 17 |
+| `single_solution` | 82 | 71 |
+| plans enumerated | 237 | 461 |
 
-Thirty of thirty-one accepted levels used to be the same puzzle with the item names changed. On the canonical fifty the effect is starker still: **7 accepted across 1 shape becomes 6 accepted across 4**, one puzzle fewer for four times the variety, which is the trade worth making. New shapes include factories with three assemblers and three splitters, which the old generator could not express at all.
+Thirty of thirty-one accepted levels used to be the same puzzle with the item names changed. New shapes include factories with three assemblers and three splitters, and — from the converging chains — levels with **no assembler at all**, where the choice is one press against two. The old generator could express neither.
 
-Note the knock-on costs, none of them hidden. Richer chemistry means more plans to place (attempts 33,000 → 59,500) and a lower win rate per attempt (6.9% → 3.8%), because the extra plans are the hard ones. `over_budget` rose from 8 to 10 on the canonical batch: more machines, more cost, and some of the new routes genuinely do not fit in 30. Those are honest rejections of real levels, not a regression.
+Note the knock-on costs, none of them hidden. Richer chemistry means more plans to place (attempts 33,000 → 65,000) and a lower win rate per attempt (6.9% → 3.6%), because the extra plans are the hard ones. `over_budget` rose from 8 to 10 on the canonical batch: more machines, more cost, and some of the new routes genuinely do not fit in 30. Those are honest rejections of real levels, not a regression. `insufficient_fanout` fell from 24 to 14 over 200 candidates, which is the real cost of the change — a level with a two-arm route no longer needs a splitter, so fewer levels are fan-out-infeasible. Fewer such levels exist; the check still fires on every one that does.
+
+One of the new shapes lands close to the floor: `gen-43` comes out at par 9 against a `min_cost` of 8. It clears every criterion and it is a very small puzzle. Whether the floor should rise is a §8 question, not a generator one.
 
 All three accepted levels share the same shape — an assembler consuming two of one item — because that is what creates the press-then-split versus split-then-press choice. Criterion 4 is therefore selecting for level 001's structure, which is reassuring and also a limitation: the generator currently has one way of making a puzzle interesting.
 
@@ -387,6 +392,9 @@ Accepted went 5 → 7 on the canonical batch. Four of the five previously accept
 
 | # | Decision | Choice |
 |---|---|---|
-| 17 | `alternativeRoutes` | **on** — sometimes offer a second recipe reaching the target, using the second assembler pair §2 always allowed (§2, §4) |
+| 17 | `alternativeRoutes` | **on** — sometimes offer a second recipe reaching the target, using the second assembler pair §2 always allowed, and sometimes converge the second source's chain on the first's item (§2, §4) |
+| 18 | §5 canonical form | Invariant under renaming item types, so a mirror image is not counted as a second idea (§5) |
 
-Judge this one on shapes rather than on the acceptance count: 2 → 6 distinct machine shapes among accepted levels over 200 candidates, and 7-accepted-across-1-shape → 6-accepted-across-4 on the canonical fifty. Acceptance moved 31 → 36, which is inside the noise this document keeps warning about. A press straight to the target would have raised acceptance further and was rejected for gutting `insufficient_fanout`; see §2.
+Judge 17 on shapes rather than the acceptance count: **2 → 8 distinct machine shapes** among accepted levels over 200 candidates. Acceptance moved 31 → 42, which is real but the smaller half of the story. A press straight to the target would have raised acceptance further still and was rejected for gutting `insufficient_fanout`; see §2.
+
+Decision 18 had to land **before** 17's converging chains, because converging is exactly what makes mirror-image plans possible. It was verified a no-op on the catalogue as it stood — 0 of 50 records changed, 0 `distinct_forms` moved — so no number previously published here was ever wrong. That ordering was luck the second time and deliberate the first.

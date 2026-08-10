@@ -96,10 +96,22 @@ export function generateLevel(
 
   // A second source sometimes supplies its own input to the assembler.
   const secondSourceType = chance(0.35) ? freshType() : null
-  if (secondSourceType !== null && chance(0.5)) {
-    // Give it a step of its own so the two arms are not symmetrical.
-    const refined = freshType()
-    press[secondSourceType] = refined
+  if (secondSourceType !== null) {
+    if (options.alternativeRoutes && chance(0.45)) {
+      // Converge: the second chain makes the *same* item as the first. A press
+      // table is keyed by input, so two inputs mapping to one output has always
+      // been expressible — the generator just never wrote it.
+      //
+      // This is the cheapest real variety available. It gives the assembler a
+      // route with no splitter in it at all (one chain per port), alongside the
+      // split-one-chain routes, and those have different machine multisets, so
+      // they are different ideas rather than mirror images of each other.
+      press[secondSourceType] = deepest
+    } else if (chance(0.5)) {
+      // Give it a step of its own so the two arms are not symmetrical.
+      const refined = freshType()
+      press[secondSourceType] = refined
+    }
   }
 
   const assembler: AssemblerRecipe[] = []
@@ -115,18 +127,25 @@ export function generateLevel(
     assembler.push({ in: pair, out: output })
     target = output
 
+    // rules-spec §3 rejects duplicate recipes at load, so a level carrying one
+    // would fail to parse rather than fail to solve. A converging second chain
+    // makes `secondArm` and `deepest` the same item, which is exactly when the
+    // alternative below collides with the recipe just pushed.
+    const alreadyHave = (a: ItemType, b: ItemType) =>
+      assembler.some((r) => r.out === output && [...r.in].sort().join() === [a, b].sort().join())
+
     // A second way to reach the same target. Without one, a level whose pair
     // is two *different* types has exactly one plan and criterion 4 can only
     // ever reject it — which is what made `single_solution` the largest class.
     if (options.alternativeRoutes && chance(0.55)) {
-      if (pair[0] !== pair[1]) {
+      if (pair[0] !== pair[1] && !alreadyHave(deepest, deepest)) {
         // Two arms already. Add the level-001 shape, which needs a splitter and
         // is therefore a genuinely different machine multiset.
         assembler.push({ in: [deepest, deepest], out: output })
-      } else if (secondArm !== null) {
+      } else if (secondArm !== null && !alreadyHave(deepest, secondArm)) {
         // It already has the split-or-press choice; offer the two-arm route too.
         assembler.push({ in: [deepest, secondArm], out: output })
-      } else {
+      } else if (secondArm === null) {
         // One source and nothing to pair it with, so the alternative has to go
         // *upstream* of the target rather than around it: a second way to reach
         // the item the assembler consumes.

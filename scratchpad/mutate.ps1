@@ -138,6 +138,18 @@ $mutations = @(
     to   = ''
     kills = 'adding the same-type pair as an alternative to a two-arm recipe'
   },
+  @{
+    file = 'packages/gen/src/generator.ts'
+    from = 'press[secondSourceType] = deepest'
+    to   = 'press[secondSourceType] = freshType()'
+    kills = 'converging the second chain on the same item'
+  },
+  @{
+    file = 'packages/gen/src/generator.ts'
+    from = 'const alreadyHave = (a: ItemType, b: ItemType) =>'
+    to   = 'const alreadyHave = (_a: ItemType, _b: ItemType) => false && '
+    kills = 'refusing to emit a duplicate recipe rules-spec 3 rejects at load'
+  },
   # The section-5 canonical form. Each of these is a different way of getting
   # "materially different" wrong, which is the project's headline claim.
   @{

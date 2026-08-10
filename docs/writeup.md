@@ -34,7 +34,7 @@ The validator answers four questions: is it solvable, is it non-trivial, does it
 
 **Stage C** is the expensive one: enumerate *plans* (which machines, what feeds what), place them, route belts with a breadth-first search, and simulate. The router only finds lanes; whether the factory actually delivers is the simulator's call.
 
-Across fifty candidates, stages A and B settle ten of them in **under a millisecond between them**. The whole batch — fifty puzzles, sixty thousand placement attempts — takes about **four seconds**. Ordering the checks by cost is most of why.
+Across fifty candidates, stages A and B settle ten of them in **under a millisecond between them**. The whole batch — fifty puzzles, sixty-five thousand placement attempts — takes about **four seconds**. Ordering the checks by cost is most of why.
 
 ## What the validator is allowed to claim
 
@@ -99,26 +99,28 @@ Fifty candidates, one seed, fully reproducible:
 
 | Outcome | Count | Claim |
 |---|---:|---|
-| accepted | 6 | — |
-| `single_solution` | 17 | bounded |
+| accepted | 7 | — |
+| `single_solution` | 15 | bounded |
 | `over_budget` | 10 | bounded |
 | `no_placement_found` | 7 | bounded — attempt cap |
-| `insufficient_fanout` | 6 | **proven** |
-| `unsolvable_chemistry` | 4 | **proven** |
+| `unsolvable_chemistry` | 6 | **proven** |
+| `insufficient_fanout` | 5 | **proven** |
 | `no_plan_within_depth` | 0 | bounded — plan caps |
 
-None of the searches were cut short — every stage-C verdict ran its full allowance. Accepted puzzles came out at par 20, 20, 23, 24, 25 and 25, and they span four different machine shapes.
+None of the searches were cut short — every stage-C verdict ran its full allowance. Accepted puzzles came out at par 9, 20, 23, 24, 24, 25 and 26, across several machine shapes.
+
+That par of 9 is worth flagging rather than hiding. It's one of the new assembler-free levels — one press against two — and it clears `min_cost` of 8 by a single point. A legitimate puzzle by every criterion I wrote down, and a very small one. Whether the floor should rise is a question about the criteria rather than the generator, so I've left it and said so.
 
 `single_solution` being the largest class is the honest summary of where this stands: the limit is no longer *"I can't find a layout"* but *"this puzzle has one idea in it"*. The generator work below moved that, and there's more of it to do.
 
 That last row scoring zero is worth leaving in the table rather than deleting. It says the planner's depth cap was never the binding constraint on these fifty candidates: every empty enumeration turned out to be provably impossible instead. That's a fact about this batch, not a guarantee, and the code stays.
 
-Where the 16,500 attempts went:
+Where the 65,000 attempts went:
 
 | Died at | Count | Share |
 |---|---:|---:|
-| routing | 57,218 | 96.2% |
-| won | 2,282 | 3.8% |
+| routing | 62,672 | 96.4% |
+| won | 2,328 | 3.6% |
 | placement | 0 | 0.0% |
 | port geometry | 0 | 0.0% |
 | simulation | 0 | 0.0% |
@@ -215,16 +217,43 @@ So the generator now sometimes offers a second route to the target. And the resu
 
 | accepted levels, 200 candidates | one route | two routes |
 |---|---:|---:|
-| accepted | 31 | 36 |
-| **distinct machine shapes** | **2** | **6** |
-| most common shape's share | 30 of 31 | 12 of 36 |
-| candidates reaching 3+ distinct forms | 0 | 11 |
+| accepted | 31 | 42 |
+| **distinct machine shapes** | **2** | **8** |
+| most common shape's share | 30 of 31 | 12 of 42 |
+| candidates reaching 3+ distinct forms | 0 | 17 |
+| `single_solution` rejections | 82 | 71 |
 
-Acceptance went up by five, which is inside the noise band I'd just spent three experiments establishing. The shape count tripled, which isn't. On the canonical fifty it's starker and it isn't even an improvement on paper: **7 accepted across 1 shape becomes 6 accepted across 4**. One puzzle fewer, four times the variety. That's the trade, and it's obviously worth taking — a daily puzzle game that ships the same puzzle every day has no daily in it.
+Acceptance is up by eleven, which is real. The shape count going from two to eight is the part I'd lead with. New shapes include factories with three assemblers and three splitters, and — my favourite — levels with **no assembler at all**, where the whole puzzle is whether to run one press or two. The old generator couldn't express either.
+
+A chunk of that came free. I'd assumed the recipe format was the blocker, because `press` maps each input type to exactly one output. It does — but it's keyed by *input*, so `press[ore] = plate` and `press[scrap] = plate` are perfectly legal and give two chains converging on the same item, which is exactly the alternative route criterion 4 wants. The format had supported this all along. I'd talked myself out of it by describing the constraint slightly wrong.
 
 **The version that scored better was worse.** My first attempt let one-source levels press straight to the target. Acceptance jumped to 53 out of 200 — far better than 36. I threw it away. A direct press means the target no longer needs a fan-out, so the `insufficient_fanout` proof stopped applying and that rejection class collapsed from 24 to 6; I'd have been buying acceptance by hollowing out one of only two things the validator can *prove*. And the "choice" it created was fake anyway: pressing costs 5 against 11 to assemble, so one route dominates and the player isn't deciding anything. The alternatives now go *upstream* of the target instead, which keeps the fan-out proof meaningful and makes the second idea a real one.
 
 There's a mutation test that swaps the good design for the rejected one and checks the suite goes red, which is the closest I can get to writing down "don't do this again" in a way that enforces itself.
+
+## A mirror image is not a second idea
+
+Before wiring up those converging chains I built one by hand to see what it did. It enumerated five plans and the validator called all five materially different:
+
+| cost | machines | drawn from |
+|---:|---|---|
+| 16 | assembler + press + splitter | `ore` |
+| 16 | assembler + press + splitter | `scrap` |
+| 18 | assembler + press + press | both |
+| 21 | assembler + press + press + splitter | `ore` |
+| 21 | assembler + press + press + splitter | `scrap` |
+
+Rows 1 and 2 are the same factory built from the other source. So are 4 and 5. Three ideas, counted as five.
+
+That's the wigglier-belt problem — the thing §5 was *written* to prevent — recurring one level up. My canonical form labelled the flow graph with concrete item types, so `source:ore->press` and `source:scrap->press` read as different ideas. A mirror image is not a second idea any more than a detour is.
+
+The fix is to make the form invariant under renaming item types: take the smallest string over every bijective renaming, so isomorphic plans collapse. It's exact rather than a heuristic, and it can't conflate `x + x` with `x + y`, because a bijection can't — which is the one thing it must never do, since that distinction is the entire level-001 lesson.
+
+Two things about this I care about more than the fix itself.
+
+**It was latent, and the ordering was deliberate.** The generator had never emitted two source types reaching the same item, so no batch was ever miscounted. I found it by building the level that would trigger it *before* writing the generator that would produce it. Re-running the fifty afterwards: zero records changed, zero `distinct_forms` moved. Provably a no-op — which is the only reason none of the numbers in this write-up had to be withdrawn. Had I done the two changes in the other order, every figure above would have been quietly inflated and I'd have published them.
+
+**It nearly broke the search.** `enumeratePlans` deduplicated its candidate plans using the same canonical form, so collapsing mirrors there would have stopped the solver ever building from the second source — a mirror is one *idea* but two different *things to build*, because the sources sit at different cells and route differently. Two genuinely distinct concepts had been sharing one function because they'd never disagreed before. They're separate now, and the search is bit-for-bit unchanged.
 
 ## What surprised me
 
@@ -242,13 +271,13 @@ Fixing that exposed a second one: one plan had a single source feeding two press
 
 ## Limitations, plainly
 
-The search is bounded and nowhere near exhaustive. It finds *a* solution often enough to judge a level — about 4% of attempts succeed, down from 7% because the richer chemistry produces harder plans — and its silence is never evidence of impossibility.
+The search is bounded and nowhere near exhaustive. It finds *a* solution often enough to judge a level — about 3.6% of attempts succeed, down from 7% because the richer chemistry produces harder plans — and its silence is never evidence of impossibility.
 
-The 12% acceptance rate is low, and `single_solution` is still the biggest rejection class even after the generator work. Two routes to the target is one idea; the recipe format itself is the next constraint, since `press` maps each input type to exactly one output and so can never offer two ways to make the same thing on its own.
+The 14% acceptance rate is low, and `single_solution` is still the biggest rejection class even after the generator work. The recipe format is the next real constraint, and this time I've checked the claim: `press` maps each input to exactly one output, so an item can never have a *choice* of transformations. Giving it one means each placed press has to know which recipe it runs — per-machine configuration the player selects, which touches the level format, the `Placement` format, the simulator, the UI and the search space all at once. That's a gameplay feature wearing a validation costume, and the roadmap is explicit that Phase 3 is the payload.
 
-Four changes in and the pattern is clear enough to state: each one moved the headline number by a few points and taught me something I had wrong about the *previous* one. The rip-up failure corrected my reading of the tally; the placement work exposed that acceptance and par pull against each other; the generator work revealed that the acceptance criterion I was proudest of had been selecting for a single puzzle shape the whole time. I'd assume there's at least one more of those waiting, and on current form it will be something I currently believe.
+Five changes in and the pattern is clear enough to state: each one moved the headline number by a few points and taught me something I had wrong about the *previous* one. The rip-up failure corrected my reading of the tally. The placement work exposed that acceptance and par pull against each other. The generator work revealed that the acceptance criterion I was proudest of had been selecting for a single puzzle shape the whole time — and then that the definition underneath it would have started over-counting the moment I made the generator any richer. I'd assume there's at least one more waiting, and on current form it'll be something I currently believe.
 
-The accepted puzzles span four machine shapes now rather than one, but four is not many, and they all still lean on an assembler consuming two of one item somewhere in the chain. The fan-out check sharpens that into something slightly uncomfortable: the generator's most productive shape is also the one that's impossible without a splitter, and it withholds the splitter 25% of the time. Six of the fifty candidates were doomed at the moment they were proposed.
+The accepted puzzles span eight machine shapes now rather than two, but most still lean on an assembler consuming two of one item somewhere in the chain. The fan-out check sharpens that into something slightly uncomfortable: the generator's most productive shape is also the one that's impossible without a splitter, and it withholds the splitter 25% of the time. Five of the fifty candidates were doomed at the moment they were proposed.
 
 The obvious fix — have the generator always offer a splitter when it writes an `x + x` recipe — is one I've deliberately not made. The spec's §2 says the generator proposes and the validator disposes, and that pre-screening its own output would hollow out the rejection log. Those five rejections are real information about a real generator. Laundering them away would make the acceptance rate look better and the artifact worth less.
 
@@ -258,4 +287,4 @@ And the refinement I'd make next: the placement search. 95% of attempts die at r
 
 The game is at **[nuenoir.github.io/factory-puzzle](https://nuenoir.github.io/factory-puzzle/)**. Source at **[github.com/nuenoir/factory-puzzle](https://github.com/nuenoir/factory-puzzle)**, including [the rules spec](rules-spec.md), [the generation spec](generation-spec.md), and [the tick-by-tick derivation](level-001.md) that the simulator had to match.
 
-188 tests. The suite is mutation-tested — an earlier version passed against a simulator whose round-robin flag never flipped, because it asserted on item counts rather than watching the mechanic. A green suite is not automatically a correct one. The generator and validator work got the same treatment before I trusted any of it: nineteen deliberate breakages, and the suite has to go red for every one. Two of them are worth the trouble on their own — one quietly reintroduces the depth bound the fan-out proof must not have, and one swaps a good design for the measurably worse one I rejected. That's as close as I can get to writing "don't do this again" in a form that enforces itself.
+192 tests. The suite is mutation-tested — an earlier version passed against a simulator whose round-robin flag never flipped, because it asserted on item counts rather than watching the mechanic. A green suite is not automatically a correct one. The generator and validator work got the same treatment before I trusted any of it: twenty-four deliberate breakages, and the suite has to go red for every one. Two of them are worth the trouble on their own — one quietly reintroduces the depth bound the fan-out proof must not have, and one swaps a good design for the measurably worse one I rejected. That's as close as I can get to writing "don't do this again" in a form that enforces itself.

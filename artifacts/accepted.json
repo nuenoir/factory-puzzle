@@ -59,75 +59,6 @@
     "par": 24
   },
   {
-    "id": "gen-6",
-    "grid": {
-      "width": 7,
-      "height": 7
-    },
-    "sources": [
-      {
-        "pos": [
-          0,
-          3
-        ],
-        "rotation": 0,
-        "emits": "gadget"
-      },
-      {
-        "pos": [
-          0,
-          5
-        ],
-        "rotation": 0,
-        "emits": "plate"
-      }
-    ],
-    "sinks": [
-      {
-        "pos": [
-          6,
-          6
-        ],
-        "rotation": 0
-      }
-    ],
-    "target": {
-      "type": "ingot",
-      "count": 5
-    },
-    "max_ticks": 300,
-    "available": [
-      "conveyor",
-      "press",
-      "assembler",
-      "splitter",
-      "merger"
-    ],
-    "recipes": {
-      "press": {
-        "gadget": "cog",
-        "cog": "widget"
-      },
-      "assembler": [
-        {
-          "in": [
-            "widget",
-            "plate"
-          ],
-          "out": "ingot"
-        },
-        {
-          "in": [
-            "widget",
-            "widget"
-          ],
-          "out": "ingot"
-        }
-      ]
-    },
-    "par": 25
-  },
-  {
     "id": "gen-20",
     "grid": {
       "width": 7,
@@ -220,7 +151,7 @@
       }
     ],
     "target": {
-      "type": "widget",
+      "type": "ingot",
       "count": 5
     },
     "max_ticks": 300,
@@ -233,7 +164,7 @@
     "recipes": {
       "press": {
         "gadget": "plate",
-        "ore": "ingot"
+        "ore": "plate"
       },
       "assembler": [
         {
@@ -241,18 +172,203 @@
             "plate",
             "plate"
           ],
-          "out": "widget"
-        },
-        {
-          "in": [
-            "plate",
-            "ingot"
-          ],
-          "out": "widget"
+          "out": "ingot"
         }
       ]
     },
     "par": 20
+  },
+  {
+    "id": "gen-34",
+    "grid": {
+      "width": 7,
+      "height": 7
+    },
+    "sources": [
+      {
+        "pos": [
+          0,
+          3
+        ],
+        "rotation": 0,
+        "emits": "gadget"
+      },
+      {
+        "pos": [
+          0,
+          6
+        ],
+        "rotation": 0,
+        "emits": "plate"
+      }
+    ],
+    "sinks": [
+      {
+        "pos": [
+          6,
+          0
+        ],
+        "rotation": 0
+      }
+    ],
+    "target": {
+      "type": "ingot",
+      "count": 5
+    },
+    "max_ticks": 300,
+    "available": [
+      "conveyor",
+      "press",
+      "assembler",
+      "splitter",
+      "merger"
+    ],
+    "recipes": {
+      "press": {
+        "gadget": "gear",
+        "plate": "widget"
+      },
+      "assembler": [
+        {
+          "in": [
+            "gear",
+            "widget"
+          ],
+          "out": "ingot"
+        },
+        {
+          "in": [
+            "gear",
+            "gear"
+          ],
+          "out": "ingot"
+        }
+      ]
+    },
+    "par": 24
+  },
+  {
+    "id": "gen-35",
+    "grid": {
+      "width": 7,
+      "height": 7
+    },
+    "sources": [
+      {
+        "pos": [
+          0,
+          1
+        ],
+        "rotation": 0,
+        "emits": "widget"
+      },
+      {
+        "pos": [
+          0,
+          5
+        ],
+        "rotation": 0,
+        "emits": "ingot"
+      }
+    ],
+    "sinks": [
+      {
+        "pos": [
+          6,
+          2
+        ],
+        "rotation": 0
+      }
+    ],
+    "target": {
+      "type": "cog",
+      "count": 5
+    },
+    "max_ticks": 300,
+    "available": [
+      "conveyor",
+      "press",
+      "assembler",
+      "splitter",
+      "merger"
+    ],
+    "recipes": {
+      "press": {
+        "widget": "plate",
+        "plate": "gadget"
+      },
+      "assembler": [
+        {
+          "in": [
+            "gadget",
+            "ingot"
+          ],
+          "out": "cog"
+        },
+        {
+          "in": [
+            "gadget",
+            "gadget"
+          ],
+          "out": "cog"
+        }
+      ]
+    },
+    "par": 26
+  },
+  {
+    "id": "gen-43",
+    "grid": {
+      "width": 5,
+      "height": 5
+    },
+    "sources": [
+      {
+        "pos": [
+          0,
+          4
+        ],
+        "rotation": 0,
+        "emits": "widget"
+      },
+      {
+        "pos": [
+          0,
+          0
+        ],
+        "rotation": 0,
+        "emits": "rod"
+      }
+    ],
+    "sinks": [
+      {
+        "pos": [
+          4,
+          3
+        ],
+        "rotation": 0
+      }
+    ],
+    "target": {
+      "type": "plate",
+      "count": 5
+    },
+    "max_ticks": 300,
+    "available": [
+      "conveyor",
+      "press",
+      "splitter",
+      "merger"
+    ],
+    "recipes": {
+      "press": {
+        "widget": "cog",
+        "cog": "plate",
+        "rod": "plate"
+      },
+      "assembler": []
+    },
+    "par": 9
   },
   {
     "id": "gen-47",
@@ -312,72 +428,5 @@
       ]
     },
     "par": 25
-  },
-  {
-    "id": "gen-49",
-    "grid": {
-      "width": 7,
-      "height": 7
-    },
-    "sources": [
-      {
-        "pos": [
-          0,
-          2
-        ],
-        "rotation": 0,
-        "emits": "ingot"
-      },
-      {
-        "pos": [
-          0,
-          6
-        ],
-        "rotation": 0,
-        "emits": "cog"
-      }
-    ],
-    "sinks": [
-      {
-        "pos": [
-          6,
-          4
-        ],
-        "rotation": 0
-      }
-    ],
-    "target": {
-      "type": "gadget",
-      "count": 5
-    },
-    "max_ticks": 300,
-    "available": [
-      "conveyor",
-      "press",
-      "assembler",
-      "splitter"
-    ],
-    "recipes": {
-      "press": {
-        "ingot": "gear"
-      },
-      "assembler": [
-        {
-          "in": [
-            "gear",
-            "gear"
-          ],
-          "out": "gadget"
-        },
-        {
-          "in": [
-            "gear",
-            "cog"
-          ],
-          "out": "gadget"
-        }
-      ]
-    },
-    "par": 20
   }
 ]
