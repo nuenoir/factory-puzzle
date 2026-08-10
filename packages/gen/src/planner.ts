@@ -272,29 +272,50 @@ export function enumeratePlans(level: Level, limits: PlanLimits = DEFAULT_PLAN_L
     })
     .filter((plan): plan is Plan => plan !== null)
 
+  // Deduplicated by `planIdentity`, not by the §5 form: two plans drawing on
+  // different sources are one idea but two different things to build, and the
+  // search needs both because they occupy different cells.
   const seen = new Set<string>()
   return plans
     .filter((plan) => {
-      const form = canonicalPlan(plan)
-      if (seen.has(form)) return false
-      seen.add(form)
+      const identity = planIdentity(plan)
+      if (seen.has(identity)) return false
+      seen.add(identity)
       return true
     })
-    .sort((a, b) => a.machineCost - b.machineCost || canonicalPlan(a).localeCompare(canonicalPlan(b)))
+    .sort((a, b) => a.machineCost - b.machineCost || planIdentity(a).localeCompare(planIdentity(b)))
     .slice(0, limits.maxPlans)
 }
 
+/** Every ordering of `items`. Only ever called on a handful. */
+function permutations<T>(items: readonly T[]): T[][] {
+  if (items.length <= 1) return [[...items]]
+  const out: T[][] = []
+  items.forEach((item, i) => {
+    for (const tail of permutations([...items.slice(0, i), ...items.slice(i + 1)])) {
+      out.push([item, ...tail])
+    }
+  })
+  return out
+}
+
 /**
- * §5. A plan's identity: its machine multiset plus its item-flow graph, with
- * positions and belt geometry discarded.
+ * A plan's identity *as something to build*, item types and all.
  *
- * Two solutions are materially different exactly when these differ. Level 001
- * is the worked example — press-then-split and split-then-press use different
- * machines, so they count; the same plan laid out with a wigglier belt
- * canonicalises identically and does not.
+ * Distinct from `canonicalPlan`, and the difference matters. Two plans that
+ * draw on different sources are the same *idea* — that is what §5 measures —
+ * but they are not the same thing to search for, because the sources sit at
+ * different cells and route differently. Deduplicating the search by the §5
+ * form would quietly stop the solver ever building from the second source.
  */
-export function canonicalPlan(plan: Plan): string {
+export function planIdentity(plan: Plan): string {
+  return formUnder(plan, new Map())
+}
+
+/** The §5 form under one particular naming of the item types. */
+function formUnder(plan: Plan, naming: ReadonlyMap<ItemType, string>): string {
   const byId = new Map(plan.nodes.map((n) => [n.id, n]))
+  const name = (item: ItemType) => naming.get(item) ?? item
 
   const machines = plan.nodes
     .filter((n) => MACHINE_KINDS.has(n.kind))
@@ -305,10 +326,60 @@ export function canonicalPlan(plan: Plan): string {
     .flatMap((node) =>
       node.inputs.map((inputId) => {
         const from = byId.get(inputId)
-        return `${from?.kind ?? '?'}:${from?.item ?? '?'}->${node.kind}`
+        return `${from?.kind ?? '?'}:${from === undefined ? '?' : name(from.item)}->${node.kind}`
       }),
     )
     .sort()
 
   return JSON.stringify({ machines, edges })
+}
+
+/**
+ * Beyond this many distinct item types the permutation search is refused
+ * rather than run. Plans here carry three to five; a level rich enough to
+ * exceed it would cost more to canonicalise than to solve.
+ */
+const MAX_TYPES_TO_RENAME = 7
+
+const cache = new WeakMap<Plan, string>()
+
+/**
+ * §5. A plan's identity: its machine multiset plus its item-flow graph, with
+ * positions and belt geometry discarded, and item types renamed canonically.
+ *
+ * Two solutions are materially different exactly when these differ. Level 001
+ * is the worked example — press-then-split and split-then-press use different
+ * machines, so they count; the same plan laid out with a wigglier belt
+ * canonicalises identically and does not.
+ *
+ * The renaming is what stops a *mirror image* counting as a second idea. Two
+ * sources whose chains have the same shape give every route a twin — "press
+ * the left one" and "press the right one" — and labelling the graph with
+ * concrete item types called those two different solutions. That is the
+ * wigglier-belt problem happening one level up, and criterion 4 is the
+ * project's headline claim, so it is worth the permutations to get right.
+ *
+ * Taking the smallest form over every bijective renaming is exact rather than
+ * a heuristic. It cannot conflate an assembler fed two of the same item with
+ * one fed two different items, because a bijection cannot turn `x + x` into
+ * `x + y` — which is the one thing this must never do.
+ */
+export function canonicalPlan(plan: Plan): string {
+  const hit = cache.get(plan)
+  if (hit !== undefined) return hit
+
+  const types = [...new Set(plan.nodes.map((n) => n.item))]
+  let best: string | null = null
+
+  if (types.length > MAX_TYPES_TO_RENAME) {
+    best = formUnder(plan, new Map())
+  } else {
+    for (const order of permutations(types)) {
+      const form = formUnder(plan, new Map(order.map((type, i) => [type, `t${i}`])))
+      if (best === null || form < best) best = form
+    }
+  }
+
+  cache.set(plan, best as string)
+  return best as string
 }

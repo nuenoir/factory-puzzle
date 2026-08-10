@@ -137,6 +137,26 @@ $mutations = @(
     from = 'assembler.push({ in: [deepest, deepest], out: output })'
     to   = ''
     kills = 'adding the same-type pair as an alternative to a two-arm recipe'
+  },
+  # The section-5 canonical form. Each of these is a different way of getting
+  # "materially different" wrong, which is the project's headline claim.
+  @{
+    file = 'packages/gen/src/planner.ts'
+    from = 'const types = [...new Set(plan.nodes.map((n) => n.item))]'
+    to   = 'const types: string[] = []'
+    kills = 'renaming item types at all, so mirror-image plans count twice'
+  },
+  @{
+    file = 'packages/gen/src/planner.ts'
+    from = 'if (best === null || form < best) best = form'
+    to   = 'if (best === null) best = form'
+    kills = 'taking the *smallest* form, so the canonical choice is arbitrary'
+  },
+  @{
+    file = 'packages/gen/src/planner.ts'
+    from = '      const identity = planIdentity(plan)'
+    to   = '      const identity = canonicalPlan(plan)'
+    kills = 'keeping mirror plans in the search even though they are one idea'
   }
 )
 

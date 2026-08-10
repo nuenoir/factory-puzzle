@@ -166,6 +166,65 @@ describe('§5 canonical form', () => {
     expect(canonicalPlan(series)).not.toBe(canonicalPlan(parallel))
   })
 
+  describe('invariance under renaming item types', () => {
+    /**
+     * A mirror image is not a second idea. With two sources whose chains are
+     * structurally identical, "press the left one" and "press the right one"
+     * are the same factory — and an item-labelled form counted them twice,
+     * which is the wigglier-belt failure §5 exists to prevent, one level up.
+     */
+    const mirrored = makeLevel({
+      sources: [
+        { pos: [0, 2], rotation: 0, emits: 'ore' },
+        { pos: [0, 4], rotation: 0, emits: 'scrap' },
+      ],
+      available: ['conveyor', 'splitter', 'press', 'assembler'],
+      // Both sources press into the same item, so every route has a twin.
+      recipes: { press: { ore: 'plate', scrap: 'plate' }, assembler: [{ in: ['plate', 'plate'], out: 'widget' }] },
+    })
+
+    it('collapses two plans that differ only in which source they draw from', () => {
+      const forms = new Set(enumeratePlans(mirrored).map(canonicalPlan))
+      // Five plans, three ideas: press-then-split, two presses, split-then-press.
+      expect(enumeratePlans(mirrored).length).toBe(5)
+      expect(forms.size).toBe(3)
+    })
+
+    it('leaves level 001 alone', () => {
+      // The guard against over-collapsing. Its two solutions use different
+      // machines, so no renaming can conflate them.
+      expect(new Set(enumeratePlans(level001).map(canonicalPlan)).size).toBe(2)
+    })
+
+    it('still separates a same-type pair from a two-type pair', () => {
+      // The property most at risk. Renaming is a bijection, so `x + x` cannot
+      // become `x + y` — if it ever could, criterion 4 would stop being able
+      // to see the level-001 shape at all.
+      const twoType = makeLevel({
+        sources: [
+          { pos: [0, 2], rotation: 0, emits: 'ore' },
+          { pos: [0, 4], rotation: 0, emits: 'scrap' },
+        ],
+        available: ['conveyor', 'splitter', 'press', 'assembler'],
+        recipes: { press: { ore: 'plate', scrap: 'rod' }, assembler: [{ in: ['plate', 'rod'], out: 'widget' }] },
+      })
+      expect(canonicalPlan(enumeratePlans(twoType)[0])).not.toBe(canonicalPlan(enumeratePlans(mirrored)[0]))
+    })
+
+    it('gives the same idea the same form across different levels', () => {
+      // Press-then-split is press-then-split whether the item is a disc or a
+      // plate. Falls out of the definition rather than being aimed at, but it
+      // is what lets the catalogue be asked how many ideas it holds in total.
+      const renamed = makeLevel({
+        target: { type: 'gadget', count: 5 },
+        available: ['conveyor', 'splitter', 'press', 'assembler'],
+        recipes: { press: { circle: 'plate' }, assembler: [{ in: ['plate', 'plate'], out: 'gadget' }] },
+      })
+      expect(new Set(enumeratePlans(renamed).map(canonicalPlan)))
+        .toEqual(new Set(enumeratePlans(level001).map(canonicalPlan)))
+    })
+  })
+
   it('counts machine cost as a sum, not a building count', () => {
     // CLAUDE.md's standing trap: cost is the §4 sum.
     const [shared] = enumeratePlans(level001)

@@ -257,11 +257,33 @@ The interesting criterion, and the one nobody else will have thought to measure.
 - the **multiset of non-conveyor buildings** used, plus
 - the **item-flow graph** between them — which machine feeds which, labelled by item type,
 
-with belt geometry, absolute positions, and rotations all discarded.
+with belt geometry, absolute positions, and rotations all discarded — and with **item types relabelled canonically**, so the form is invariant under renaming them.
 
 Level 001 is the worked example. Press-then-split is `{press, splitter}` with `source → press → splitter → assembler×2`. Split-then-press is `{splitter, press×2}` with `source → splitter → press×2 → assembler`. Different multisets, so: materially different. That is the decision the level is built around, and the definition catches it.
 
 The same layout with a wigglier belt canonicalises identically and does **not** count. Without that, every level would trivially have thousands of "solutions" and criterion 4 would measure nothing. `ASSUMPTION`
+
+### Why the relabelling clause exists
+
+Labelling the flow graph with concrete item types looks harmless and is not. Take a level with two sources, `ore` and `scrap`, where both press into `plate`:
+
+| cost | machines | drawn from |
+|---:|---|---|
+| 16 | assembler + press + splitter | `ore` |
+| 16 | assembler + press + splitter | `scrap` |
+| 18 | assembler + press + press | both |
+| 21 | assembler + press + press + splitter | `ore` |
+| 21 | assembler + press + press + splitter | `scrap` |
+
+Rows 1 and 2 are the same factory built from the other source, and so are 4 and 5. There are three ideas here; an item-labelled canonical form counts five. That is the failure the wigglier-belt clause was written to prevent, occurring one level up — a **mirror image is not a second idea** any more than a detour is.
+
+Canonical renaming fixes it: compute the form under every bijective renaming of the item types the plan mentions and keep the lexicographically smallest, so two plans isomorphic up to renaming collapse to one string. Exact rather than heuristic, and cheap — a plan carries three to five types, so it is a handful of orderings, memoised per plan.
+
+What it must **not** collapse is an assembler fed two of the same item versus one fed two different items. Renaming preserves that, because a bijection cannot turn `x + x` into `x + y`. The tests assert it directly, since it is the property this clause could plausibly break.
+
+The flaw was latent, not active: the generator never emitted two source types reaching the same item, so no batch was ever miscounted. It was found by building the level that would trigger it *before* writing the generator that would — which is the only reason the numbers in this document never had to be withdrawn.
+
+One side effect worth having. Forms are now comparable **across** levels, since press-then-split is the same idea whether the item is called `disc` or `plate`. The catalogue can be asked how many distinct ideas it contains in total, not just how many each level has.
 
 ---
 

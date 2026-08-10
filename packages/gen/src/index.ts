@@ -20,6 +20,7 @@ export { routeBelts, type Grid, type PortRef } from './router.ts'
 export {
   enumeratePlans,
   canonicalPlan,
+  planIdentity,
   machineCostOf,
   DEFAULT_PLAN_LIMITS,
   type Plan,
