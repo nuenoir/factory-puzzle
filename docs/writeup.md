@@ -1,6 +1,8 @@
 # Generating factory puzzles, and knowing when you haven't
 
-*An engineering note on the puzzle generator behind [Factory Puzzle](https://nuenoir.github.io/factory-puzzle/). Draft.*
+*An engineering note on the puzzle generator behind [Factory Puzzle](https://nuenoir.github.io/factory-puzzle/).*
+
+*Every number here comes from one reproducible batch — `npm run generate -- --count 50 --seed 1` — and the log it writes is in the repo. Where a figure is quoted mid-narrative it is from that moment in the work, and later changes sometimes moved it again; the tables are the current state.*
 
 I built a small daily puzzle game — route items across a hex grid, through presses and assemblers, into a sink, scored against par like golf — and then a generator that invents new puzzles and a validator that decides which are worth playing.
 
@@ -129,7 +131,7 @@ Three of those five rows are zero, and that's the most useful thing in the table
 
 ## Spending the same budget differently
 
-That table is a suggestion, so I took it. If 95% of attempts die at routing, then 95% of the time the machines were down and *one belt run* couldn't find a lane — and the whole attempt, placement included, got thrown away. Wiring is much cheaper to redo than placement. So: re-pair the ports, re-order the belt runs, try again on the same cells before abandoning them.
+That table is a suggestion, so I took it. If almost every attempt dies at routing, then almost every time the machines were down and *one belt run* couldn't find a lane — and the whole attempt, placement included, got thrown away. Wiring is much cheaper to redo than placement. So: re-pair the ports, re-order the belt runs, try again on the same cells before abandoning them.
 
 I did not trust fifty candidates to settle this. Acceptance moves by two or three, and changing a search parameter reshuffles the entire random stream, so an arm can look better for no reason at all — which is exactly how the rotation experiment above fooled me into trying it. Measured over **200 candidates across four independent seed ranges**, paired:
 
@@ -154,6 +156,8 @@ Then the interesting bit, which I'd have got wrong if I'd only looked at the hea
 Retrying the wiring barely wins more often. It wins on the **second** solution. The second plan is the machine-dense one — split-then-press buys an extra press — so it needs more belt runs through a grid that's already fuller, and it's precisely the layout that placement restarts alone could almost never wire. Acceptance requires two materially different solutions, so criterion 4 had been gated not by whether a puzzle *has* two ideas but by whether my router could realise the harder one. That's a measurement artefact sitting inside an acceptance criterion, and nothing about the criterion would have revealed it.
 
 **The part I care about more than the acceptance rate.** Par is the cheapest solution *found*, which means a weak search ships a generous one. Two of the already-accepted levels had their par tightened by the same change: `gen-1` from 26 down to **21**, `gen-20` from 24 to 23. Those puzzles were shipping a par you could beat without trying, and nothing in the pipeline would have flagged it — the level was accepted, the par was verified, the number was just *loose*. A better search doesn't only accept more puzzles. It scores the ones it already accepted more honestly, and that's the failure mode I'd least like to have shipped.
+
+Those two figures are from the moment of that change, and later work moved them again — `gen-1` sits at 24 in the batch shipping today. Individual pars keep moving whenever the search does, which is exactly why the batch gets re-run after every change and why the aggregate measure below, not any single level, is the one I trust.
 
 ## The one that didn't work, and taught me more
 
@@ -227,7 +231,7 @@ Acceptance is up by eleven, which is real. The shape count going from two to eig
 
 A chunk of that came free. I'd assumed the recipe format was the blocker, because `press` maps each input type to exactly one output. It does — but it's keyed by *input*, so `press[ore] = plate` and `press[scrap] = plate` are perfectly legal and give two chains converging on the same item, which is exactly the alternative route criterion 4 wants. The format had supported this all along. I'd talked myself out of it by describing the constraint slightly wrong.
 
-**The version that scored better was worse.** My first attempt let one-source levels press straight to the target. Acceptance jumped to 53 out of 200 — far better than 36. I threw it away. A direct press means the target no longer needs a fan-out, so the `insufficient_fanout` proof stopped applying and that rejection class collapsed from 24 to 6; I'd have been buying acceptance by hollowing out one of only two things the validator can *prove*. And the "choice" it created was fake anyway: pressing costs 5 against 11 to assemble, so one route dominates and the player isn't deciding anything. The alternatives now go *upstream* of the target instead, which keeps the fan-out proof meaningful and makes the second idea a real one.
+**The version that scored better was worse.** My first attempt let one-source levels press straight to the target. Acceptance jumped to 53 out of 200, comfortably above anything the design I shipped reaches. I threw it away. A direct press means the target no longer needs a fan-out, so the `insufficient_fanout` proof stopped applying and that rejection class collapsed from 24 to 6; I'd have been buying acceptance by hollowing out one of only two things the validator can *prove*. And the "choice" it created was fake anyway: pressing costs 5 against 11 to assemble, so one route dominates and the player isn't deciding anything. The alternatives now go *upstream* of the target instead, which keeps the fan-out proof meaningful and makes the second idea a real one.
 
 There's a mutation test that swaps the good design for the rejected one and checks the suite goes red, which is the closest I can get to writing down "don't do this again" in a way that enforces itself.
 
@@ -263,7 +267,7 @@ Fixing that exposed a second one: one plan had a single source feeding two press
 
 **The obvious optimisation made things worse.** With the search now the bottleneck, I tried sampling runner-up machine rotations instead of always taking the best-aligned one, on the theory that a deterministic heuristic fails identically on every restart. It pushed the number of candidates finding nothing from 23 to 29. Attempts spent on worse orientations are attempts not spent on fresh placements. Reverted — and recorded, because a negative result is the evidence against the next person's obvious idea.
 
-**Every layout that routed, won.** Of 16,500 attempts, 833 produced a complete factory and *all 833* of them delivered. Not one routed successfully and then failed to run. The planner and router produce correct factories whenever they produce anything; the entire bottleneck is geometric, not logical.
+**Every layout that routed, won.** Of 65,000 attempts, 2,328 produced a complete factory and *all 2,328* of them delivered. Not one routed successfully and then failed to run, and that has held on every batch I've run all the way through. The planner and router produce correct factories whenever they produce anything; the entire bottleneck is geometric, not logical.
 
 **A search problem turned out to be an arithmetic problem.** Splitting one rejection code into two was meant to be bookkeeping. It surfaced five levels that were provably impossible for a reason no amount of searching would have found, because the impossibility was about port counts and the search was about geometry. I'd been treating "the solver found nothing" as a single phenomenon for the entire project.
 
