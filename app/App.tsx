@@ -29,7 +29,7 @@ import {
 
 import { Grid, type PointerPhase } from './components/Grid'
 import { Palette, type Tool } from './components/Palette'
-import { beltsFromPath, directionBetween, editReducer, placementAt } from './editor'
+import { beltsFromPath, directionBetween, editReducer, ignoresCell, placementAt } from './editor'
 import { today } from './daily'
 
 /**
@@ -177,7 +177,13 @@ export default function App() {
       }
       const pos: PosTuple = [x, y]
       setActiveCell(pos)
-      if (fixtureCells.has(`${x},${y}`)) return
+      // Fixtures are immutable, but the belt tool may still use one as the end
+      // of a route — see `ignoresCell`. Guarding them all off here is what made
+      // four levels in five unbuildable at par: the belt beside the sink kept
+      // whatever direction the drag was walking in rather than turning to face
+      // it, and nothing on screen said why the factory never delivered.
+      const isFixture = fixtureCells.has(`${x},${y}`)
+      if (ignoresCell(tool, isFixture)) return
 
       if (tool === 'delete') {
         dispatch({ kind: 'remove', pos })
@@ -189,7 +195,7 @@ export default function App() {
         // bookend one: drag out of a splitter and the first belt faces back at
         // it; drag into an assembler and the last belt points at it.
         const occupant = placementAt(placements, pos)
-        const isBuilding = fixtureCells.has(`${x},${y}`) || (occupant !== undefined && occupant.type !== 'conveyor')
+        const isBuilding = isFixture || (occupant !== undefined && occupant.type !== 'conveyor')
 
         if (phase === 'down') {
           drag.current = isBuilding

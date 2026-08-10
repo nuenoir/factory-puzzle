@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { beltsFromPath, directionBetween, editReducer, placementAt } from './editor'
+import { beltsFromPath, directionBetween, editReducer, ignoresCell, placementAt } from './editor'
 import type { Placement, PosTuple } from '@factory/sim'
 
 describe('directionBetween', () => {
@@ -151,5 +151,45 @@ describe('editReducer', () => {
   it('leaves conveyors alone when asked to rotate — they have no rotation', () => {
     const after = editReducer([belt], { kind: 'rotate', pos: [1, 1] })
     expect(after).toEqual([belt])
+  })
+})
+
+describe('ignoresCell', () => {
+  /**
+   * The rule that was wrong. Sources and sinks were guarded off from every
+   * tool, which reads as caution and is not: a belt drag has to reach the sink
+   * for the last belt to turn and face it (§4 connects by mutual facing).
+   * Without that the belt kept whichever direction the drag was walking in,
+   * usually off the board, and the factory silently never delivered.
+   *
+   * It stayed hidden because level 001's reference solution parks the assembler
+   * next to the sink, so no belt ever needs to run into a fixture. On the
+   * generated pool 79% of levels need one at par — four days in five were
+   * unbuildable.
+   */
+  it('protects fixtures from every tool that builds or erases', () => {
+    for (const tool of ['press', 'assembler', 'splitter', 'merger', 'delete'] as const) {
+      expect(ignoresCell(tool, true)).toBe(true)
+    }
+  })
+
+  it('lets the belt tool touch a fixture, so a route can end at one', () => {
+    expect(ignoresCell('conveyor', true)).toBe(false)
+  })
+
+  it('never ignores an ordinary cell', () => {
+    for (const tool of ['conveyor', 'press', 'assembler', 'splitter', 'merger', 'delete'] as const) {
+      expect(ignoresCell(tool, false)).toBe(false)
+    }
+  })
+
+  it('is what lets a route into a sink point at the sink', () => {
+    // The end-to-end shape of the bug, in the pure layer: with the fixture as
+    // terminus the last belt faces it; without, it carries straight on.
+    const path: PosTuple[] = [[5, 5], [5, 6]]
+    const facing = beltsFromPath(path, { terminus: [6, 6] })
+    const walkingOn = beltsFromPath(path)
+    expect(facing[1].out).toBe('E')
+    expect(walkingOn[1].out).not.toBe('E')
   })
 })

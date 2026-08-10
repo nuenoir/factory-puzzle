@@ -57,4 +57,24 @@ export function placementAt(placements: readonly Placement[], pos: PosTuple): Pl
   return placements.find((p) => samePos(p.pos, pos))
 }
 
+/**
+ * Whether the editor should ignore a cell outright for the tool in hand.
+ *
+ * Sources and sinks are level fixtures (§4): nothing may be built on them and
+ * nothing may erase them. It does not follow that a gesture may never *touch*
+ * one, and conflating those two is a bug worth naming.
+ *
+ * §4 connects buildings by mutual facing, so the belt beside a sink has to
+ * point at the sink. The only way a drag learns that is by the gesture reaching
+ * the sink and standing in as the route's terminus. Refuse the cell outright
+ * and the last belt keeps whatever direction the player happened to be walking
+ * in — frequently off the edge of the board — and the factory silently fails to
+ * deliver with no visible cause. The same goes for a drag leaving a source.
+ *
+ * So: fixtures are immutable to every tool, and legal endpoints for the belt.
+ */
+export function ignoresCell(tool: PlaceableType | 'delete', isFixture: boolean): boolean {
+  return isFixture && tool !== 'conveyor'
+}
+
 export type { PlaceableType }
