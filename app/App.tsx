@@ -31,6 +31,7 @@ import { Grid, type PointerPhase } from './components/Grid'
 import { Palette, type Tool } from './components/Palette'
 import { beltsFromPath, directionBetween, editReducer, ignoresCell, placementAt } from './editor'
 import { today } from './daily'
+import { loadHistory, record, resultFor, saveHistory, stats } from './history'
 
 /**
  * The one clock read in the app.
@@ -52,6 +53,17 @@ const SPEEDS = [
   { label: '2×', ms: 150 },
   { label: '4×', ms: 75 },
 ] as const
+
+/**
+ * A score as golf says it. Par is the cheapest solution the validator's search
+ * found and was never proven optimal, so "under" is a real thing to land on and
+ * deserves saying out loud rather than showing as a negative number.
+ */
+function scoreLabel(toPar: number): string {
+  if (toPar < 0) return `${-toPar} under par`
+  if (toPar === 0) return 'par'
+  return `+${toPar}`
+}
 
 /** Sources and sinks are fixed by the level and not placeable (§4). */
 const fixtureCells = new Set(
@@ -82,8 +94,34 @@ export default function App() {
   /** The cell under the finger, so the board can respond to being touched. */
   const [activeCell, setActiveCell] = useState<PosTuple | null>(null)
 
+  // Read once. Nothing else writes this key, so re-reading would only ever
+  // return what we last put there.
+  const [history, setHistory] = useState(loadHistory)
+
   const solution = useMemo(() => ({ level_id: level.id, placements }), [placements])
   const cost = useMemo(() => costOf(solution), [solution])
+  const costRef = useRef(cost)
+  costRef.current = cost
+
+  /**
+   * Bank a win. Called from the tick that detects it, with the cost taken from
+   * a ref rather than the closure — `advance` is memoised on an empty
+   * dependency list and would otherwise bank whatever the cost was when the
+   * callback was created, which is zero.
+   */
+  const bank = useCallback((ticks: number) => {
+    setHistory((previousHistory) => {
+      const next = record(previousHistory, {
+        day,
+        levelId: level.id,
+        par: level.par,
+        cost: costRef.current,
+        ticks,
+      })
+      if (next !== previousHistory) saveHistory(next)
+      return next
+    })
+  }, [])
 
   /** Rebuild from the current placements. Any edit lands here, so any edit
    *  also rewinds the run to tick 0. */
@@ -128,6 +166,7 @@ export default function App() {
     if ((world.delivered.get(level.target.type) ?? 0) >= level.target.count) {
       setStatus('won')
       setPlaying(false)
+      bank(world.tickCount)
     } else if (world.tickCount >= level.max_ticks) {
       setStatus('timeout')
       setPlaying(false)
@@ -252,6 +291,9 @@ export default function App() {
   const finished = status === 'won' || status === 'jammed' || status === 'timeout'
   const runnable = snap !== null && errors.length === 0
 
+  const summary = useMemo(() => stats(history, day), [history])
+  const banked = resultFor(history, day)
+
   return (
     <ScrollView contentContainerStyle={styles.screen}>
       <View style={styles.header}>
@@ -259,6 +301,16 @@ export default function App() {
         <Text style={styles.subtitle}>
           Day {day} — deliver {level.target.count} {level.target.type}
         </Text>
+        {summary.currentStreak > 0 || banked !== undefined ? (
+          <Text style={styles.streak}>
+            {summary.currentStreak > 0
+              ? `${summary.currentStreak} day streak`
+              : 'Solved today'}
+            {banked !== undefined
+              ? ` · today ${scoreLabel(banked.cost - banked.par)}`
+              : ''}
+          </Text>
+        ) : null}
       </View>
 
       {snap ? (
@@ -393,6 +445,7 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', marginBottom: 14 },
   title: { color: colors.text, fontSize: 24, fontWeight: '700' },
   subtitle: { color: colors.muted, fontSize: 13, marginTop: 2 },
+  streak: { color: colors.good, fontSize: 12, fontWeight: '700', marginTop: 6, letterSpacing: 0.3 },
   errorBox: { backgroundColor: colors.panel, borderRadius: 10, padding: 16, maxWidth: 460 },
   errorTitle: { color: colors.bad, fontSize: 15, fontWeight: '700', marginBottom: 6 },
   errorLine: { color: colors.muted, fontSize: 12, marginTop: 2 },
