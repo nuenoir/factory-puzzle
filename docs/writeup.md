@@ -269,6 +269,20 @@ Fixing that exposed a second one: one plan had a single source feeding two press
 
 **The weakness of the search was leaking into the puzzles.** I thought a bounded search cost me candidates it couldn't solve. It also cost me *accuracy on the ones it could* — par is the cheapest solution found, so every gap in the search showed up as a puzzle scored too generously. Improving the router dropped one accepted level's par from 26 to 21. Nothing was broken; the number was just soft, and no test could have told me, because "cheapest found" is exactly what it claimed to be.
 
+## The building the validator can't think about
+
+One of the five placeable buildings never appears in anything the validator produces. The merger — two inputs, one output — is offered by the palette on roughly half the generated levels, is fully implemented in the simulator, and shows up in **zero** plans, because the planner has no merger node.
+
+I found this auditing what was left rather than by anything failing, which is the uncomfortable way to find things. It looks exactly like an oversight.
+
+It isn't, and the argument is short. A merger adds a building and removes none, so it can only pay for itself through throughput — joining two streams into one. Throughput never binds in this game: five items wanted, 300 ticks allowed, and one press produces an item every two ticks. So any winning factory with a merger has a cheaper winning twin without it, found by deleting the merger and one of its feeder chains.
+
+I built both rather than leave it as an argument. On a two-source level, the merger layout wins — it's a real factory — and costs **8 against 3**, delivering in **9 ticks against 8**. Dominated on cost *and* speed.
+
+So teaching the planner about mergers would add only dominated plans. They could never be par; their sole effect would be inflating `distinct_forms` with factories nobody would build. That's the mirror-image problem again wearing a different hat, and criterion 4 is meant to count ideas, not decorations. The omission stays, now with a test that constructs both layouts and asserts the domination, so the reasoning can't quietly rot.
+
+What I'm careful *not* to claim: a merger has no input filter, so a hand-built solution could merge two different item types onto one shared belt to save conveyor cost, and if it saved more than three it would win. The planner models one item type per node and can't express that at all. So the honest statement is "no merger appears in a cheapest plan the planner can represent" — weaker than "no merger appears in a cheapest solution", and the gap between those two sentences is the whole reason this project keeps separate words for bounds and proofs.
+
 ## Limitations, plainly
 
 The search is bounded and nowhere near exhaustive. It finds *a* solution often enough to judge a level — about 3.6% of attempts succeed, down from 7% because the richer chemistry produces harder plans — and its silence is never evidence of impossibility.
@@ -287,4 +301,4 @@ And the refinement I'd make next: the placement search. 95% of attempts die at r
 
 The game is at **[nuenoir.github.io/factory-puzzle](https://nuenoir.github.io/factory-puzzle/)**. Source at **[github.com/nuenoir/factory-puzzle](https://github.com/nuenoir/factory-puzzle)**, including [the rules spec](rules-spec.md), [the generation spec](generation-spec.md), and [the tick-by-tick derivation](level-001.md) that the simulator had to match.
 
-192 tests. The suite is mutation-tested — an earlier version passed against a simulator whose round-robin flag never flipped, because it asserted on item counts rather than watching the mechanic. A green suite is not automatically a correct one. The generator and validator work got the same treatment before I trusted any of it: twenty-four deliberate breakages, and the suite has to go red for every one. Two of them are worth the trouble on their own — one quietly reintroduces the depth bound the fan-out proof must not have, and one swaps a good design for the measurably worse one I rejected. That's as close as I can get to writing "don't do this again" in a form that enforces itself.
+195 tests. The suite is mutation-tested — an earlier version passed against a simulator whose round-robin flag never flipped, because it asserted on item counts rather than watching the mechanic. A green suite is not automatically a correct one. The generator and validator work got the same treatment before I trusted any of it: twenty-five deliberate breakages, and the suite has to go red for every one. Two of them are worth the trouble on their own — one quietly reintroduces the depth bound the fan-out proof must not have, and one swaps a good design for the measurably worse one I rejected. That's as close as I can get to writing "don't do this again" in a form that enforces itself.

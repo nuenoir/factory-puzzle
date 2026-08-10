@@ -83,6 +83,21 @@ The check: enumerate the multisets of source indices that some derivation of the
 
 This is exact in the same sense stage A is, and it closes a real gap. Five of the first fifty candidates are rejected here; every one of them is an `x + x -> target` assembler recipe on a level with no splitter, and previously all five were filed under the *bounded* stage-C code, which understated what the validator could actually prove. Erring toward the weaker claim is the safe direction to err, but it is still wrong.
 
+### What the planner deliberately cannot express: the merger
+
+A plan node is a source, a press, an assembler, a splitter or a sink. There is no merger, even though the palette offers one on roughly half the generated levels and the simulator implements it in full (rules-spec §9, and §14 cases 11 and 12 test it). That looks like an oversight and is not one.
+
+A merger adds a building and removes none, so it can only earn its three-point cost through **throughput**, by joining two streams into one. Throughput never binds here: the target is 5 items against a `max_ticks` of 300, and a single press at one item every two ticks clears that with two orders of magnitude in hand. So for any winning solution containing a merger there is a cheaper winning one without it, obtained by deleting the merger and one of its input chains.
+
+Measured rather than argued. On a two-source level where both belt straight to the sink, the merger layout wins — it is a real factory, not a broken one — and costs **8 against 3**, delivering in **9 ticks against 8**. Dominated on both axes the game scores. There is a test that constructs both and asserts exactly that, so the reasoning cannot rot silently.
+
+Planning mergers would therefore contribute only *dominated* plans. They could never become `par`, and their only effect would be to inflate `distinctForms` with factories nobody would build — which is the failure §5's renaming clause was just hardened against, arriving from a different direction. Criterion 4 is supposed to count ideas, not decorations.
+
+Two honest consequences follow, and neither is hidden:
+
+- **`merger` in a level's `available` list has no effect on any verdict.** A level offering one is judged identically to a level that does not; a test asserts the two enumerate the same plans. It is left in the palette because the simulator supports it and a player may still place one — they will simply come in over par, which is the game working as intended.
+- **One case sits outside the argument.** A merger has no input filter, so a hand-built solution could merge two *different* item types onto a shared belt run to save conveyors, and if it saved more than three cost it would beat the merger-free version. The planner models one item type per node and cannot express that at all. So the claim above is "no merger appears in a cheapest plan the planner can represent", which is weaker than "no merger appears in a cheapest solution". Stated rather than glossed, because that is the difference between a bound and a proof.
+
 ### Stage C — placement and routing *(bounded, inexact)*
 
 Search over *plans* rather than over cells. A plan is a small dataflow graph — which machines exist and what feeds what — derived from the recipe DAG. For each plan:

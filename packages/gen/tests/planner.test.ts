@@ -9,7 +9,9 @@
 import { describe, expect, it } from 'vitest'
 import type { Level } from '@factory/sim'
 
-import { canonicalPlan, enumeratePlans, machineCostOf, type Plan } from '../src/index'
+import { COST, ROTATIONS, portsFor, simulate, type Placement, type PosTuple } from '@factory/sim'
+
+import { canonicalPlan, enumeratePlans, machineCostOf, routeBelts, type Plan } from '../src/index'
 
 function makeLevel(overrides: Partial<Level> = {}): Level {
   return {
@@ -116,6 +118,123 @@ describe('enumeratePlans', () => {
 
   it('respects the plan cap', () => {
     expect(enumeratePlans(level001, { maxDepth: 4, maxPlans: 1 })).toHaveLength(1)
+  })
+})
+
+describe('§4 the planner has no merger, on purpose', () => {
+  /**
+   * `PlanNodeKind` lists source, press, assembler, splitter and sink. No
+   * merger — even though the palette offers one on roughly half the generated
+   * levels and the simulator implements it fully (rules-spec §9, §14 cases 11
+   * and 12). That looks like an oversight and is not one.
+   *
+   * A merger adds a building and removes none, so it can only earn its cost
+   * through throughput. Throughput never binds here: the target is 5 items
+   * against `max_ticks` of 300, and even one press at an item every two ticks
+   * clears that with two orders of magnitude to spare. So every winning
+   * solution containing a merger has a cheaper winning counterpart without it,
+   * found by deleting the merger and one of its input chains.
+   *
+   * Planning mergers would therefore only add *dominated* plans, inflating
+   * `distinctForms` with factories nobody would build — the same mistake the
+   * renaming clause above exists to prevent, arriving from a different angle.
+   *
+   * This test builds the merger solution rather than arguing about it.
+   */
+  const twoSources = makeLevel({
+    grid: { width: 5, height: 5 },
+    sources: [
+      { pos: [0, 1], rotation: 0, emits: 'ore' },
+      { pos: [0, 3], rotation: 0, emits: 'ore' },
+    ],
+    sinks: [{ pos: [4, 2], rotation: 0 }],
+    target: { type: 'ore', count: 5 },
+    available: ['conveyor', 'merger'],
+    recipes: {},
+  })
+
+  const key = (p: PosTuple) => `${p[0]},${p[1]}`
+  const fixtures = new Set([...twoSources.sources, ...twoSources.sinks].map((b) => key(b.pos)))
+
+  /** One source belted straight to the sink; the other simply unused. */
+  function withoutMerger() {
+    const belts = routeBelts(
+      twoSources.grid,
+      fixtures,
+      { pos: twoSources.sources[0].pos, dir: portsFor('source', 0).out[0] },
+      { pos: twoSources.sinks[0].pos, dir: portsFor('sink', 0).in[0] },
+    )
+    expect(belts).not.toBeNull()
+    return simulate(twoSources, { level_id: twoSources.id, placements: belts as Placement[] })
+  }
+
+  /** Both sources joined through a merger, then on to the sink. */
+  function withMerger() {
+    for (let x = 1; x < 4; x += 1) {
+      for (let y = 0; y < 5; y += 1) {
+        if (fixtures.has(key([x, y]))) continue
+        for (const rotation of ROTATIONS) {
+          const ports = portsFor('merger', rotation)
+          const occupied = new Set(fixtures).add(key([x, y]))
+          const belts: Placement[] = []
+
+          const arms = twoSources.sources.every((source, i) => {
+            const leg = routeBelts(twoSources.grid, occupied,
+              { pos: source.pos, dir: portsFor('source', source.rotation).out[0] },
+              { pos: [x, y], dir: ports.in[i] })
+            if (leg === null) return false
+            for (const b of leg) { occupied.add(key(b.pos)); belts.push(b) }
+            return true
+          })
+          if (!arms) continue
+
+          const out = routeBelts(twoSources.grid, occupied,
+            { pos: [x, y], dir: ports.out[0] },
+            { pos: twoSources.sinks[0].pos, dir: portsFor('sink', 0).in[0] })
+          if (out === null) continue
+
+          const result = simulate(twoSources, {
+            level_id: twoSources.id,
+            placements: [{ type: 'merger', pos: [x, y], rotation }, ...belts, ...out],
+          })
+          if (result.won) return result
+        }
+      }
+    }
+    return null
+  }
+
+  it('can be beaten by simply not using the merger', () => {
+    const plain = withoutMerger()
+    const merged = withMerger()
+
+    // The merger layout is a real, winning factory — this is not a claim that
+    // mergers are broken.
+    expect(merged).not.toBeNull()
+    expect(merged?.won).toBe(true)
+    expect(plain.won).toBe(true)
+
+    // ...and it is dominated on both axes the game scores.
+    expect(merged?.cost).toBeGreaterThan(plain.cost)
+    expect(merged?.ticks).toBeGreaterThanOrEqual(plain.ticks)
+  })
+
+  it('costs something and saves nothing, which is why it can never be par', () => {
+    // The general argument in one line: a merger is a building you add, and
+    // adding a building cannot lower a sum of building costs.
+    expect(COST.merger).toBeGreaterThan(0)
+  })
+
+  it('never appears in a plan, so no verdict depends on the palette offering one', () => {
+    const offered = makeLevel({
+      available: ['conveyor', 'splitter', 'merger', 'press', 'assembler'],
+      recipes: { press: { circle: 'disc' }, assembler: [{ in: ['disc', 'disc'], out: 'widget' }] },
+    })
+    const withoutIt = makeLevel({
+      available: ['conveyor', 'splitter', 'press', 'assembler'],
+      recipes: { press: { circle: 'disc' }, assembler: [{ in: ['disc', 'disc'], out: 'widget' }] },
+    })
+    expect(enumeratePlans(offered).map(canonicalPlan)).toEqual(enumeratePlans(withoutIt).map(canonicalPlan))
   })
 })
 

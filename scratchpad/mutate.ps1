@@ -150,6 +150,12 @@ $mutations = @(
     to   = 'const alreadyHave = (_a: ItemType, _b: ItemType) => false && '
     kills = 'refusing to emit a duplicate recipe rules-spec 3 rejects at load'
   },
+  @{
+    file = 'packages/sim/src/types.ts'
+    from = '  merger: 3,'
+    to   = '  merger: 0,'
+    kills = 'a merger costing something, which is why it can never be par'
+  },
   # The section-5 canonical form. Each of these is a different way of getting
   # "materially different" wrong, which is the project's headline claim.
   @{
