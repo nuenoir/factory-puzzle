@@ -12,7 +12,11 @@ import type { Level } from '@factory/sim'
 
 import {
   ALL_REJECTION_CODES,
+  DEFAULT_GENERATOR_OPTIONS,
   DEFAULT_SEARCH_LIMITS,
+  canonicalPlan,
+  deliverableWithoutFanout,
+  enumeratePlans,
   generateLevel,
   runBatch,
   summarise,
@@ -231,7 +235,7 @@ describe('§6 the rejection log', () => {
 
   it('writes one self-contained JSON object per line', () => {
     const { records } = runBatch(
-      { count: 3, startSeed: 1, criteria: { minCost: 8, maxCost: 30 }, limits: { ...patient, attemptsPerPlan: 5, timeoutMs: 500 }, generator: { minGrid: 5, maxGrid: 5 } },
+      { count: 3, startSeed: 1, criteria: { minCost: 8, maxCost: 30 }, limits: { ...patient, attemptsPerPlan: 5, timeoutMs: 500 }, generator: { ...DEFAULT_GENERATOR_OPTIONS, minGrid: 5, maxGrid: 5 } },
     )
     const lines = toJsonl(records).trimEnd().split('\n')
     expect(lines).toHaveLength(3)
@@ -255,13 +259,78 @@ describe('§7 reproducibility', () => {
     for (let seed = 1; seed <= 20; seed += 1) expect(generateLevel(seed).par).toBe(0)
   })
 
+  it('stays within the recipe budget §2 allows', () => {
+    // §2: press 1-3 entries, assembler 0-2 pairs. The second assembler pair was
+    // permitted from the start and simply never emitted, which is what capped
+    // every accepted puzzle at one shape.
+    for (let seed = 1; seed <= 200; seed += 1) {
+      const level = generateLevel(seed)
+      expect(Object.keys(level.recipes.press ?? {}).length).toBeLessThanOrEqual(3)
+      expect((level.recipes.assembler ?? []).length).toBeLessThanOrEqual(2)
+    }
+  })
+
+  it('never emits the same assembler pair twice', () => {
+    // rules-spec §3 rejects duplicate recipes at load, so a level carrying one
+    // would fail to parse rather than fail to solve.
+    for (let seed = 1; seed <= 200; seed += 1) {
+      const pairs = (generateLevel(seed).recipes.assembler ?? []).map((r) =>
+        [[...r.in].sort().join('+'), r.out].join('->'),
+      )
+      expect(new Set(pairs).size).toBe(pairs.length)
+    }
+  })
+})
+
+describe('§2 offering more than one route to the target', () => {
+  const shapesOver = (alternativeRoutes: boolean, count = 60) => {
+    const shapes = new Set<string>()
+    let plans = 0
+    for (let seed = 1; seed <= count; seed += 1) {
+      const level = generateLevel(seed, { ...DEFAULT_GENERATOR_OPTIONS, alternativeRoutes })
+      const enumerated = enumeratePlans(level)
+      plans += enumerated.length
+      for (const plan of enumerated) shapes.add(JSON.parse(canonicalPlan(plan)).machines.join('+'))
+    }
+    // Not "levels with two or more plans": a level with an `x + x` pair already
+    // had two (press-then-split and split-then-press), so that count barely
+    // moves. What the second recipe buys is more *kinds* of plan, which is what
+    // criterion 4 reads.
+    return { shapes: shapes.size, plans }
+  }
+
+  it('produces more distinct machine shapes than a single route can', () => {
+    // The point of the change. With one recipe per level the only structure
+    // that can satisfy criterion 4 is an `x + x` pair with a splitter, so every
+    // accepted puzzle is the same puzzle. Measured over 200 candidates the
+    // accepted shapes went from 2 to 6; this asserts the direction on a smaller
+    // sample rather than pinning the count, which tuning would invalidate.
+    const before = shapesOver(false)
+    const after = shapesOver(true)
+    expect(after.shapes).toBeGreaterThan(before.shapes)
+    expect(after.plans).toBeGreaterThan(before.plans)
+  })
+
+  it('keeps the target behind a fan-out so the stage-B proof still applies', () => {
+    // A press straight to the target was the first attempt and it read fine
+    // until the log was checked: a fan-out-free route means `insufficient_fanout`
+    // stops applying, and it fell from 24 rejections to 6. Alternatives now go
+    // upstream of the target instead. This guards that choice.
+    let stillInfeasible = 0
+    for (let seed = 1; seed <= 200; seed += 1) {
+      const level = generateLevel(seed)
+      if (!level.available.includes('splitter') && !deliverableWithoutFanout(level)) stillInfeasible += 1
+    }
+    expect(stillInfeasible).toBeGreaterThan(5)
+  })
+
   it('reproduces a whole batch apart from the clock', () => {
     const options = {
       count: 4,
       startSeed: 100,
       criteria: { minCost: 8, maxCost: 30 },
       limits: { ...patient, attemptsPerPlan: 20, timeoutMs: 2000 },
-      generator: { minGrid: 5, maxGrid: 6 },
+      generator: { ...DEFAULT_GENERATOR_OPTIONS, minGrid: 5, maxGrid: 6 },
     }
     const strip = (json: string) => json.replace(/"elapsed_ms":\d+/g, '"elapsed_ms":0')
     const first = strip(JSON.stringify(runBatch(options).records))

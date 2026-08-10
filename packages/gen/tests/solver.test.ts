@@ -10,7 +10,13 @@
 import { describe, expect, it } from 'vitest'
 import { simulate, type Level } from '@factory/sim'
 
-import { canonicalPlan, generateLevel, solve, DEFAULT_SEARCH_LIMITS } from '../src/index'
+import {
+  canonicalPlan,
+  generateLevel,
+  solve,
+  DEFAULT_GENERATOR_OPTIONS,
+  DEFAULT_SEARCH_LIMITS,
+} from '../src/index'
 
 function makeLevel(overrides: Partial<Level> = {}): Level {
   return {
@@ -26,6 +32,18 @@ function makeLevel(overrides: Partial<Level> = {}): Level {
     ...overrides,
   }
 }
+
+/**
+ * The specific levels these tests were written against.
+ *
+ * A test asserting "on this level a one-pass search fails and a two-pass one
+ * succeeds" only means something while the level stays the same puzzle, and
+ * `generateLevel` answers to the generator's options — which have since changed
+ * and will change again. Pinning them is the same discipline as pinning the
+ * search knobs below: hold everything still except the thing under test.
+ */
+const asWritten = (seed: number) =>
+  generateLevel(seed, { ...DEFAULT_GENERATOR_OPTIONS, alternativeRoutes: false })
 
 /** A generous budget so these tests measure the search, not the clock. */
 const patient = { ...DEFAULT_SEARCH_LIMITS, attemptsPerPlan: 400, timeoutMs: 30000 }
@@ -125,7 +143,7 @@ describe('retrying the wiring instead of the placement', () => {
   const wiringOnly = { ...DEFAULT_SEARCH_LIMITS, placementSamples: 1, attemptsPerPlan: 250, timeoutMs: 30000 }
 
   it('finds a factory on a level that re-placing alone never wires', () => {
-    const level = generateLevel(45)
+    const level = asWritten(45)
     const once = solve(level, 45, { ...wiringOnly, routeRetries: 1 })
     const twice = solve(level, 45, { ...wiringOnly, routeRetries: 2 })
     expect(once.cheapest).toBeNull()
@@ -139,7 +157,7 @@ describe('retrying the wiring instead of the placement', () => {
     // The gain concentrates here rather than in raw wins. Acceptance needs two
     // distinct forms (§5), and the second plan is the machine-dense one, which
     // is exactly the one placement restarts struggle to wire.
-    const level = generateLevel(47)
+    const level = asWritten(47)
     const once = solve(level, 47, { ...wiringOnly, routeRetries: 1 })
     const twice = solve(level, 47, { ...wiringOnly, routeRetries: 2 })
     expect(once.distinctForms).toBe(1)
@@ -148,9 +166,11 @@ describe('retrying the wiring instead of the placement', () => {
 
   it('still lets the simulator be the only judge of a win', () => {
     // Retrying must not smuggle in a layout that routed but does not run.
-    const outcome = solve(generateLevel(47), 47, { ...DEFAULT_SEARCH_LIMITS, routeRetries: 4, timeoutMs: 30000 })
+    const level = asWritten(47)
+    const outcome = solve(level, 47, { ...DEFAULT_SEARCH_LIMITS, routeRetries: 4, timeoutMs: 30000 })
+    expect(outcome.solutions.length).toBeGreaterThan(0)
     for (const found of outcome.solutions) {
-      expect(simulate(generateLevel(47), found.solution).won).toBe(true)
+      expect(simulate(level, found.solution).won).toBe(true)
     }
   })
 
@@ -185,7 +205,7 @@ describe('choosing a roomier cell rather than the first free one', () => {
     // — only half the restarts sample for room, so the effect is roughly half
     // what the heuristic alone produces, and this asserts the mechanism rather
     // than a fixed count the next tuning change would invalidate.
-    const level = generateLevel(41)
+    const level = asWritten(41)
     const first = solve(level, 41, { ...roomy, placementSamples: 1 })
     const spacious = solve(level, 41, { ...roomy, placementSamples: 4 })
     expect(first.tally.won).toBeGreaterThan(0) // not a level that was broken anyway
@@ -195,7 +215,7 @@ describe('choosing a roomier cell rather than the first free one', () => {
   it('reaches a second solution on a level that found none at all', () => {
     // 0 -> 2 distinct forms, which is the difference between rejected and
     // accepted. The whole acceptance gain is made of levels like this.
-    const level = generateLevel(21)
+    const level = asWritten(21)
     expect(solve(level, 21, { ...roomy, placementSamples: 1 }).distinctForms).toBe(0)
     expect(solve(level, 21, { ...roomy, placementSamples: 4 }).distinctForms).toBe(2)
   })

@@ -34,7 +34,7 @@ The validator answers four questions: is it solvable, is it non-trivial, does it
 
 **Stage C** is the expensive one: enumerate *plans* (which machines, what feeds what), place them, route belts with a breadth-first search, and simulate. The router only finds lanes; whether the factory actually delivers is the simulator's call.
 
-Across fifty candidates, stages A and B settle eleven of them in **under a millisecond between them**. The whole batch — fifty puzzles, thirty-three thousand placement attempts — takes **2.5 seconds**. Ordering the checks by cost is most of why.
+Across fifty candidates, stages A and B settle ten of them in **under a millisecond between them**. The whole batch — fifty puzzles, sixty thousand placement attempts — takes about **four seconds**. Ordering the checks by cost is most of why.
 
 ## What the validator is allowed to claim
 
@@ -99,17 +99,17 @@ Fifty candidates, one seed, fully reproducible:
 
 | Outcome | Count | Claim |
 |---|---:|---|
-| accepted | 7 | — |
-| `single_solution` | 16 | bounded |
-| `no_placement_found` | 8 | bounded — attempt cap |
-| `over_budget` | 8 | bounded |
-| `unsolvable_chemistry` | 6 | **proven** |
-| `insufficient_fanout` | 5 | **proven** |
+| accepted | 6 | — |
+| `single_solution` | 17 | bounded |
+| `over_budget` | 10 | bounded |
+| `no_placement_found` | 7 | bounded — attempt cap |
+| `insufficient_fanout` | 6 | **proven** |
+| `unsolvable_chemistry` | 4 | **proven** |
 | `no_plan_within_depth` | 0 | bounded — plan caps |
 
-None of the searches were cut short — every stage-C verdict ran its full allowance. Accepted puzzles came out at par 21, 22, 22, 23, 23, 24 and 25.
+None of the searches were cut short — every stage-C verdict ran its full allowance. Accepted puzzles came out at par 20, 20, 23, 24, 25 and 25, and they span four different machine shapes.
 
-`single_solution` overtaking `no_placement_found` is the most interesting movement in that table. The limit is no longer mostly *"I can't find a layout"* but *"this puzzle genuinely has one idea in it"* — which is a fact about the generator rather than about the search. `over_budget` tripling says the same thing from the other side: levels that used to find nothing now find something, and some of those turn out to be expensive. A rejection moving from `no_placement_found` to `over_budget` is the log getting more truthful.
+`single_solution` being the largest class is the honest summary of where this stands: the limit is no longer *"I can't find a layout"* but *"this puzzle has one idea in it"*. The generator work below moved that, and there's more of it to do.
 
 That last row scoring zero is worth leaving in the table rather than deleting. It says the planner's depth cap was never the binding constraint on these fifty candidates: every empty enumeration turned out to be provably impossible instead. That's a fact about this batch, not a guarantee, and the code stays.
 
@@ -117,8 +117,8 @@ Where the 16,500 attempts went:
 
 | Died at | Count | Share |
 |---|---:|---:|
-| routing | 30,734 | 93.1% |
-| won | 2,266 | 6.9% |
+| routing | 57,218 | 96.2% |
+| won | 2,282 | 3.8% |
 | placement | 0 | 0.0% |
 | port geometry | 0 | 0.0% |
 | simulation | 0 | 0.0% |
@@ -203,6 +203,29 @@ Against the control — same budget, heuristic off — it's 20 → 31 accepted a
 
 **The control also shows how noisy this all is.** Doubling the budget on its own moved acceptance *down*, 23 → 20, purely because a changed restart count reshuffles the PRNG stream. Swings of ±3 are nothing. That's now three search changes in a row where the single 50-candidate batch would have told me the wrong thing.
 
+## Every puzzle was the same puzzle
+
+With the search no longer the bottleneck, `single_solution` became the biggest rejection class — and that's not a search problem, it's the generator admitting it only knows one joke.
+
+I'd been writing "all accepted puzzles share the same shape" in this section for three revisions as a limitation. When I finally measured it, it was worse than I'd been saying: of 31 accepted levels across 200 candidates, **30 were the same shape** — press-then-split versus split-then-press, with the item names changed. One puzzle, thirty costumes.
+
+The cause was a single unemitted line. The spec had always allowed two assembler recipes per level; the generator only ever wrote one. With one recipe, the *only* structure that can satisfy "two materially different solutions" is an `x + x` pair with a splitter. Every other level had exactly one plan and was rejected no matter how good the search got. Criterion 4 wasn't selecting for interesting puzzles, it was selecting for the one shape that could possibly pass.
+
+So the generator now sometimes offers a second route to the target. And the result is the wrong number to lead with:
+
+| accepted levels, 200 candidates | one route | two routes |
+|---|---:|---:|
+| accepted | 31 | 36 |
+| **distinct machine shapes** | **2** | **6** |
+| most common shape's share | 30 of 31 | 12 of 36 |
+| candidates reaching 3+ distinct forms | 0 | 11 |
+
+Acceptance went up by five, which is inside the noise band I'd just spent three experiments establishing. The shape count tripled, which isn't. On the canonical fifty it's starker and it isn't even an improvement on paper: **7 accepted across 1 shape becomes 6 accepted across 4**. One puzzle fewer, four times the variety. That's the trade, and it's obviously worth taking — a daily puzzle game that ships the same puzzle every day has no daily in it.
+
+**The version that scored better was worse.** My first attempt let one-source levels press straight to the target. Acceptance jumped to 53 out of 200 — far better than 36. I threw it away. A direct press means the target no longer needs a fan-out, so the `insufficient_fanout` proof stopped applying and that rejection class collapsed from 24 to 6; I'd have been buying acceptance by hollowing out one of only two things the validator can *prove*. And the "choice" it created was fake anyway: pressing costs 5 against 11 to assemble, so one route dominates and the player isn't deciding anything. The alternatives now go *upstream* of the target instead, which keeps the fan-out proof meaningful and makes the second idea a real one.
+
+There's a mutation test that swaps the good design for the rejected one and checks the suite goes red, which is the closest I can get to writing down "don't do this again" in a way that enforces itself.
+
 ## What surprised me
 
 **Twice, a bug looked like bad luck.** Early on, every single placement attempt failed to route — 1000 out of 1000. A random search failing 100% of the time isn't unlucky, it's broken. The cause was that I paired the splitter's two outputs to the assembler's two inputs in index order, which made the two belt runs cross. A hex grid has no crossings, so nothing could ever route. The real solution uses the opposite pairing.
@@ -219,13 +242,13 @@ Fixing that exposed a second one: one plan had a single source feeding two press
 
 ## Limitations, plainly
 
-The search is bounded and nowhere near exhaustive. It finds *a* solution often enough to judge a level — about 7% of attempts succeed — and its silence is never evidence of impossibility.
+The search is bounded and nowhere near exhaustive. It finds *a* solution often enough to judge a level — about 4% of attempts succeed, down from 7% because the richer chemistry produces harder plans — and its silence is never evidence of impossibility.
 
-The 14% acceptance rate is better than it was and still low. But the shape of the remaining problem has changed: `single_solution` is now the biggest rejection class, and that's a statement about the generator rather than the search. It's proposing puzzles with one idea in them, and no amount of searching invents a second. The next honest move is generator-side — recipe shapes that admit more than one route — not more search.
+The 12% acceptance rate is low, and `single_solution` is still the biggest rejection class even after the generator work. Two routes to the target is one idea; the recipe format itself is the next constraint, since `press` maps each input type to exactly one output and so can never offer two ways to make the same thing on its own.
 
-Three search changes in and the pattern is clear enough to state: each one moved acceptance by a few points and taught me something I had wrong about the *previous* one. I'd assume there's at least one more of those waiting.
+Four changes in and the pattern is clear enough to state: each one moved the headline number by a few points and taught me something I had wrong about the *previous* one. The rip-up failure corrected my reading of the tally; the placement work exposed that acceptance and par pull against each other; the generator work revealed that the acceptance criterion I was proudest of had been selecting for a single puzzle shape the whole time. I'd assume there's at least one more of those waiting, and on current form it will be something I currently believe.
 
-All seven accepted puzzles share the same shape — an assembler consuming two of one item — because that's the only structure the generator currently has for creating a real choice. Criterion 4 is faithfully selecting for it, which is both reassuring and a ceiling. The fan-out check sharpens that observation into something slightly uncomfortable: the generator's one interesting shape is also the one that's impossible without a splitter, and it withholds the splitter 25% of the time. Five of the fifty candidates were doomed at the moment they were proposed.
+The accepted puzzles span four machine shapes now rather than one, but four is not many, and they all still lean on an assembler consuming two of one item somewhere in the chain. The fan-out check sharpens that into something slightly uncomfortable: the generator's most productive shape is also the one that's impossible without a splitter, and it withholds the splitter 25% of the time. Six of the fifty candidates were doomed at the moment they were proposed.
 
 The obvious fix — have the generator always offer a splitter when it writes an `x + x` recipe — is one I've deliberately not made. The spec's §2 says the generator proposes and the validator disposes, and that pre-screening its own output would hollow out the rejection log. Those five rejections are real information about a real generator. Laundering them away would make the acceptance rate look better and the artifact worth less.
 
@@ -235,4 +258,4 @@ And the refinement I'd make next: the placement search. 95% of attempts die at r
 
 The game is at **[nuenoir.github.io/factory-puzzle](https://nuenoir.github.io/factory-puzzle/)**. Source at **[github.com/nuenoir/factory-puzzle](https://github.com/nuenoir/factory-puzzle)**, including [the rules spec](rules-spec.md), [the generation spec](generation-spec.md), and [the tick-by-tick derivation](level-001.md) that the simulator had to match.
 
-184 tests. The suite is mutation-tested — an earlier version passed against a simulator whose round-robin flag never flipped, because it asserted on item counts rather than watching the mechanic. A green suite is not automatically a correct one. The generator work got the same treatment before I trusted it: sixteen deliberate breakages, including one that quietly reintroduces the depth bound the fan-out proof must not have, and the suite has to go red for every one.
+188 tests. The suite is mutation-tested — an earlier version passed against a simulator whose round-robin flag never flipped, because it asserted on item counts rather than watching the mechanic. A green suite is not automatically a correct one. The generator and validator work got the same treatment before I trusted any of it: nineteen deliberate breakages, and the suite has to go red for every one. Two of them are worth the trouble on their own — one quietly reintroduces the depth bound the fan-out proof must not have, and one swaps a good design for the measurably worse one I rejected. That's as close as I can get to writing "don't do this again" in a form that enforces itself.

@@ -34,9 +34,32 @@ const TYPE_POOL: readonly ItemType[] = ['ore', 'ingot', 'plate', 'gear', 'rod', 
 export interface GeneratorOptions {
   readonly minGrid: number
   readonly maxGrid: number
+  /**
+   * Sometimes offer a second recipe producing the target, so the puzzle has
+   * more than one idea in it.
+   *
+   * §2 always allowed two assembler pairs; the generator only ever emitted one,
+   * which meant the *only* structure that could satisfy criterion 4 was an
+   * `x + x` pair with a splitter — press-then-split versus split-then-press.
+   * Every level without that shape had exactly one plan and was rejected
+   * `single_solution` no matter how well the search performed.
+   *
+   * This does not screen anything. A second route is proposed, not verified;
+   * the validator still decides whether either route can be built (§2).
+   *
+   * Measured over 200 candidates: the accepted levels went from **2 distinct
+   * machine shapes to 6**, and from 30 of 31 sharing one shape to a spread of
+   * 12/10/4/4/4/2. That is the result worth having. Acceptance itself only
+   * moved 31 → 36, which is the smaller half of the story.
+   */
+  readonly alternativeRoutes: boolean
 }
 
-export const DEFAULT_GENERATOR_OPTIONS: GeneratorOptions = { minGrid: 5, maxGrid: 7 }
+export const DEFAULT_GENERATOR_OPTIONS: GeneratorOptions = {
+  minGrid: 5,
+  maxGrid: 7,
+  alternativeRoutes: true,
+}
 
 export function generateLevel(
   seed: number,
@@ -83,15 +106,41 @@ export function generateLevel(
   let target = deepest
   if (chance(0.8)) {
     const output = freshType()
+    const secondArm = secondSourceType === null ? null : press[secondSourceType] ?? secondSourceType
     // Two of the same item is the level-001 shape, and the only one that
     // creates the press-then-split versus split-then-press choice — which is
     // what criterion 4 is looking for.
     const pair: [ItemType, ItemType] =
-      secondSourceType !== null && chance(0.45)
-        ? [deepest, press[secondSourceType] ?? secondSourceType]
-        : [deepest, deepest]
+      secondArm !== null && chance(0.45) ? [deepest, secondArm] : [deepest, deepest]
     assembler.push({ in: pair, out: output })
     target = output
+
+    // A second way to reach the same target. Without one, a level whose pair
+    // is two *different* types has exactly one plan and criterion 4 can only
+    // ever reject it — which is what made `single_solution` the largest class.
+    if (options.alternativeRoutes && chance(0.55)) {
+      if (pair[0] !== pair[1]) {
+        // Two arms already. Add the level-001 shape, which needs a splitter and
+        // is therefore a genuinely different machine multiset.
+        assembler.push({ in: [deepest, deepest], out: output })
+      } else if (secondArm !== null) {
+        // It already has the split-or-press choice; offer the two-arm route too.
+        assembler.push({ in: [deepest, secondArm], out: output })
+      } else {
+        // One source and nothing to pair it with, so the alternative has to go
+        // *upstream* of the target rather than around it: a second way to reach
+        // the item the assembler consumes.
+        //
+        // Deliberately not a press straight to the target. That was tried and
+        // it reads well until you look at the log — a fan-out-free route to the
+        // target means the stage-B fan-out proof stops applying, and it took
+        // `insufficient_fanout` from 24 rejections to 6. Keeping the target
+        // behind an `x + x` pair keeps that proof meaningful, and the extra
+        // idea still lands because the assembler here needs a splitter of its
+        // own, making it a genuinely different machine multiset.
+        assembler.push({ in: [base, base], out: deepest })
+      }
+    }
   }
 
   const sourceRows: number[] = []

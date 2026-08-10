@@ -1,4 +1,4 @@
-# Generation and Validation — Spec v0.4
+# Generation and Validation — Spec v0.5
 
 **Purpose.** Defines what the generator proposes, what the validator checks, and — most importantly — what the validator is allowed to *claim*. This document is authoritative for `packages/gen/` the way `rules-spec.md` is for `packages/sim/`.
 
@@ -29,9 +29,14 @@ Varied per candidate:
 | `sinks` | 1 | Position on the east edge. |
 | `recipes.press` | 1–3 entries | A one-to-one type map. |
 | `recipes.assembler` | 0–2 pairs | Unordered; duplicates rejected at load (rules-spec §3). |
+
 | `target` | any type the recipes mention | Deliberately *not* pre-checked for reachability. |
 | `available` | subset | Always includes `conveyor`. |
 | `max_ticks` | 300 | Fixed. `ASSUMPTION` |
+
+**Two routes to the target, sometimes.** The second assembler pair was allowed here from the beginning and went unemitted for months, which quietly capped what the generator could produce: with one recipe the *only* structure able to satisfy criterion 4 is an `x + x` pair plus a splitter, so every accepted puzzle was press-then-split versus split-then-press with the item names changed. It now sometimes offers a second way to reach the target — the other pairing when there are two sources, and otherwise a second way to reach the item the assembler consumes.
+
+That last case is deliberately *upstream* of the target rather than a shortcut to it. A press straight to the target was the first attempt and it works, in the sense that acceptance rose further; it also means the target no longer needs a fan-out, and `insufficient_fanout` fell from 24 rejections in 200 to 6. Hollowing out a proven rejection class to raise the acceptance rate is the wrong trade, and the shortcut's "choice" was fake anyway — pressing costs 5 against 11 to assemble, so one route dominates and nothing is really being decided.
 
 **The generator does not pre-filter.** It proposes; the validator disposes. Screening candidates for reachability before submitting them would make stage A dead code and hollow out the rejection log — the breakdown is only interesting if the generator is genuinely allowed to be wrong. `ASSUMPTION`
 
@@ -96,17 +101,19 @@ Random restarts are cheap but wasteful. On level 001, roughly **1.5% of attempts
 
 | Outcome | Count | Claim |
 |---|---|---|
-| accepted | 7 | — |
-| `single_solution` | 16 | bounded |
-| `no_placement_found` | 8 | bounded (attempt cap) |
-| `over_budget` | 8 | bounded |
-| `unsolvable_chemistry` | 6 | **proven** |
-| `insufficient_fanout` | 5 | **proven** |
+| accepted | 6 | — |
+| `single_solution` | 17 | bounded |
+| `over_budget` | 10 | bounded |
+| `no_placement_found` | 7 | bounded (attempt cap) |
+| `insufficient_fanout` | 6 | **proven** |
+| `unsolvable_chemistry` | 4 | **proven** |
 | `no_plan_within_depth` | 0 | bounded (plan caps) |
 
-Of 33,000 attempts, 30,734 (93.1%) died at routing and 2,266 (6.9%) won; **not one** failed at placement, at port geometry, or at simulation. Those three zeroes have held across every batch, and they say the failures are geometric — machines landing where belts cannot reach them — rather than logical.
+Of 59,500 attempts, 57,218 (96.2%) died at routing and 2,282 (3.8%) won; **not one** failed at placement, at port geometry, or at simulation. Those three zeroes have held across every batch, and they say the failures are geometric — machines landing where belts cannot reach them — rather than logical.
 
-`single_solution` is now the largest rejection class, having overtaken `no_placement_found` as the search improved. That is a meaningful change of regime: the limit is no longer mostly "cannot find a layout" but "this puzzle genuinely has one idea in it", which is a fact about the generator's output rather than about the search. Note also that `over_budget` rose from 3 to 8 — a stronger search finds solutions for levels that previously found none, and some of those turn out to be expensive. A rejection moving from `no_placement_found` to `over_budget` is the log becoming more truthful, not the generator getting worse.
+`single_solution` is the largest rejection class, having overtaken `no_placement_found` once the search stopped being the limit. That is the change of regime the generator work responds to: the constraint is no longer mostly "cannot find a layout" but "this puzzle has one idea in it".
+
+Read the acceptance count with care. Six is one *fewer* than the seven the previous configuration produced on these same fifty seeds, and it is the right trade: those seven were all the same shape, while these six span four. Over 200 candidates the change is 31 → 36 accepted and 2 → 6 shapes. Fifty candidates cannot resolve a difference of one.
 
 `no_plan_within_depth` scoring zero is worth recording rather than hiding: every candidate whose enumerator came up empty turned out to be provably fan-out-infeasible, so the planner's depth cap was never the binding constraint on this batch. The code stays, because that is a fact about these fifty candidates and not a guarantee about the next fifty.
 
@@ -197,6 +204,24 @@ That last decision needs a control, because it changes two things at once. All f
 Against the control — same 500-restart budget, heuristic off — the heuristic takes acceptance from 20 to 31 and par excess from 0.500 to 0.406. It wins on both axes with the budget held constant, which is the comparison that licenses the change.
 
 **The control also shows how noisy acceptance is.** Doubling the budget on its own moved it *down*, 23 to 20, because a changed restart count reshuffles the entire PRNG stream. Swings of ±3 mean nothing. This is the third search change in a row where the single canonical batch would have given the wrong answer, and it is why every one of them is measured across four ranges paired.
+
+### More than one kind of puzzle
+
+With the search no longer the limit, `single_solution` became the largest rejection class — and that is a statement about the generator, not the search. §2 now sometimes offers a second route to the target.
+
+**Acceptance is the wrong headline for this one.** It moved 31 → 36 over 200 candidates, which is barely outside the noise band established above. What actually changed is the *shape* of what gets accepted:
+
+| accepted levels, 200 candidates | one route | alternative routes |
+|---|---:|---:|
+| accepted | 31 | 36 |
+| **distinct machine shapes among them** | **2** | **6** |
+| most common shape's share | 30 of 31 | 12 of 36 |
+| candidates reaching 3+ distinct forms | 0 | 11 |
+| plans enumerated | 237 | 412 |
+
+Thirty of thirty-one accepted levels used to be the same puzzle with the item names changed. On the canonical fifty the effect is starker still: **7 accepted across 1 shape becomes 6 accepted across 4**, one puzzle fewer for four times the variety, which is the trade worth making. New shapes include factories with three assemblers and three splitters, which the old generator could not express at all.
+
+Note the knock-on costs, none of them hidden. Richer chemistry means more plans to place (attempts 33,000 → 59,500) and a lower win rate per attempt (6.9% → 3.8%), because the extra plans are the hard ones. `over_budget` rose from 8 to 10 on the canonical batch: more machines, more cost, and some of the new routes genuinely do not fit in 30. Those are honest rejections of real levels, not a regression.
 
 All three accepted levels share the same shape — an assembler consuming two of one item — because that is what creates the press-then-split versus split-then-press choice. Criterion 4 is therefore selecting for level 001's structure, which is reassuring and also a limitation: the generator currently has one way of making a puzzle interesting.
 
@@ -335,3 +360,11 @@ Chosen by measurement over 200 candidates, not by argument; 1 reproduces the pre
 | 16 | `attemptsPerPlan` | **250 → 500**, so the roomy half is an addition rather than a reallocation |
 
 Accepted went 5 → 7 on the canonical batch. Four of the five previously accepted levels kept their par exactly; `gen-49` slipped by one, from 23 to 24, which is a single-level loss against a clear aggregate gain and is recorded rather than smoothed over. Batch time 1.4s → 2.5s.
+
+**Amended 9 Aug 2026 (v0.5).** The generator, now that it rather than the search is the limit:
+
+| # | Decision | Choice |
+|---|---|---|
+| 17 | `alternativeRoutes` | **on** — sometimes offer a second recipe reaching the target, using the second assembler pair §2 always allowed (§2, §4) |
+
+Judge this one on shapes rather than on the acceptance count: 2 → 6 distinct machine shapes among accepted levels over 200 candidates, and 7-accepted-across-1-shape → 6-accepted-across-4 on the canonical fifty. Acceptance moved 31 → 36, which is inside the noise this document keeps warning about. A press straight to the target would have raised acceptance further and was rejected for gutting `insufficient_fanout`; see §2.

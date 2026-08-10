@@ -119,6 +119,24 @@ $mutations = @(
     from = 'if (!taken.has(`${n.x},${n.y}`)) free += 1'
     to   = 'free += 1'
     kills = 'counting only the neighbours a belt could really use'
+  },
+  @{
+    file = 'packages/gen/src/generator.ts'
+    from = 'if (options.alternativeRoutes && chance(0.55)) {'
+    to   = 'if (false) {'
+    kills = 'offering a second route to the target at all'
+  },
+  @{
+    file = 'packages/gen/src/generator.ts'
+    from = 'assembler.push({ in: [base, base], out: deepest })'
+    to   = 'press[deepest] = output'
+    kills = 'keeping the target behind a fan-out (this IS the rejected design)'
+  },
+  @{
+    file = 'packages/gen/src/generator.ts'
+    from = 'assembler.push({ in: [deepest, deepest], out: output })'
+    to   = ''
+    kills = 'adding the same-type pair as an alternative to a two-arm recipe'
   }
 )
 

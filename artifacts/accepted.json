@@ -9,7 +9,7 @@
       {
         "pos": [
           0,
-          3
+          0
         ],
         "rotation": 0,
         "emits": "plate"
@@ -19,7 +19,7 @@
       {
         "pos": [
           6,
-          3
+          0
         ],
         "rotation": 0
       }
@@ -33,8 +33,7 @@
       "conveyor",
       "press",
       "assembler",
-      "splitter",
-      "merger"
+      "splitter"
     ],
     "recipes": {
       "press": {
@@ -47,10 +46,86 @@
             "ingot"
           ],
           "out": "widget"
+        },
+        {
+          "in": [
+            "plate",
+            "plate"
+          ],
+          "out": "ingot"
         }
       ]
     },
-    "par": 21
+    "par": 24
+  },
+  {
+    "id": "gen-6",
+    "grid": {
+      "width": 7,
+      "height": 7
+    },
+    "sources": [
+      {
+        "pos": [
+          0,
+          3
+        ],
+        "rotation": 0,
+        "emits": "gadget"
+      },
+      {
+        "pos": [
+          0,
+          5
+        ],
+        "rotation": 0,
+        "emits": "plate"
+      }
+    ],
+    "sinks": [
+      {
+        "pos": [
+          6,
+          6
+        ],
+        "rotation": 0
+      }
+    ],
+    "target": {
+      "type": "ingot",
+      "count": 5
+    },
+    "max_ticks": 300,
+    "available": [
+      "conveyor",
+      "press",
+      "assembler",
+      "splitter",
+      "merger"
+    ],
+    "recipes": {
+      "press": {
+        "gadget": "cog",
+        "cog": "widget"
+      },
+      "assembler": [
+        {
+          "in": [
+            "widget",
+            "plate"
+          ],
+          "out": "ingot"
+        },
+        {
+          "in": [
+            "widget",
+            "widget"
+          ],
+          "out": "ingot"
+        }
+      ]
+    },
+    "par": 25
   },
   {
     "id": "gen-20",
@@ -72,7 +147,7 @@
       {
         "pos": [
           6,
-          6
+          2
         ],
         "rotation": 0
       }
@@ -86,8 +161,7 @@
       "conveyor",
       "press",
       "assembler",
-      "splitter",
-      "merger"
+      "splitter"
     ],
     "recipes": {
       "press": {
@@ -100,62 +174,17 @@
             "cog"
           ],
           "out": "ore"
+        },
+        {
+          "in": [
+            "gadget",
+            "gadget"
+          ],
+          "out": "cog"
         }
       ]
     },
     "par": 23
-  },
-  {
-    "id": "gen-21",
-    "grid": {
-      "width": 6,
-      "height": 6
-    },
-    "sources": [
-      {
-        "pos": [
-          0,
-          2
-        ],
-        "rotation": 0,
-        "emits": "ore"
-      }
-    ],
-    "sinks": [
-      {
-        "pos": [
-          5,
-          1
-        ],
-        "rotation": 0
-      }
-    ],
-    "target": {
-      "type": "plate",
-      "count": 5
-    },
-    "max_ticks": 300,
-    "available": [
-      "conveyor",
-      "press",
-      "assembler",
-      "splitter"
-    ],
-    "recipes": {
-      "press": {
-        "ore": "widget"
-      },
-      "assembler": [
-        {
-          "in": [
-            "widget",
-            "widget"
-          ],
-          "out": "plate"
-        }
-      ]
-    },
-    "par": 22
   },
   {
     "id": "gen-25",
@@ -167,7 +196,7 @@
       {
         "pos": [
           0,
-          1
+          4
         ],
         "rotation": 0,
         "emits": "gadget"
@@ -175,7 +204,7 @@
       {
         "pos": [
           0,
-          4
+          1
         ],
         "rotation": 0,
         "emits": "ore"
@@ -213,70 +242,17 @@
             "plate"
           ],
           "out": "widget"
-        }
-      ]
-    },
-    "par": 23
-  },
-  {
-    "id": "gen-29",
-    "grid": {
-      "width": 5,
-      "height": 5
-    },
-    "sources": [
-      {
-        "pos": [
-          0,
-          3
-        ],
-        "rotation": 0,
-        "emits": "plate"
-      },
-      {
-        "pos": [
-          0,
-          4
-        ],
-        "rotation": 0,
-        "emits": "gear"
-      }
-    ],
-    "sinks": [
-      {
-        "pos": [
-          4,
-          4
-        ],
-        "rotation": 0
-      }
-    ],
-    "target": {
-      "type": "rod",
-      "count": 5
-    },
-    "max_ticks": 300,
-    "available": [
-      "conveyor",
-      "press",
-      "assembler",
-      "splitter"
-    ],
-    "recipes": {
-      "press": {
-        "plate": "ore"
-      },
-      "assembler": [
+        },
         {
           "in": [
-            "ore",
-            "ore"
+            "plate",
+            "ingot"
           ],
-          "out": "rod"
+          "out": "widget"
         }
       ]
     },
-    "par": 25
+    "par": 20
   },
   {
     "id": "gen-47",
@@ -288,7 +264,7 @@
       {
         "pos": [
           0,
-          0
+          2
         ],
         "rotation": 0,
         "emits": "widget"
@@ -298,7 +274,7 @@
       {
         "pos": [
           5,
-          4
+          1
         ],
         "rotation": 0
       }
@@ -325,10 +301,17 @@
             "gear"
           ],
           "out": "ingot"
+        },
+        {
+          "in": [
+            "widget",
+            "widget"
+          ],
+          "out": "gear"
         }
       ]
     },
-    "par": 22
+    "par": 25
   },
   {
     "id": "gen-49",
@@ -340,7 +323,7 @@
       {
         "pos": [
           0,
-          1
+          2
         ],
         "rotation": 0,
         "emits": "ingot"
@@ -348,7 +331,7 @@
       {
         "pos": [
           0,
-          2
+          6
         ],
         "rotation": 0,
         "emits": "cog"
@@ -358,7 +341,7 @@
       {
         "pos": [
           6,
-          5
+          4
         ],
         "rotation": 0
       }
@@ -372,8 +355,7 @@
       "conveyor",
       "press",
       "assembler",
-      "splitter",
-      "merger"
+      "splitter"
     ],
     "recipes": {
       "press": {
@@ -386,9 +368,16 @@
             "gear"
           ],
           "out": "gadget"
+        },
+        {
+          "in": [
+            "gear",
+            "cog"
+          ],
+          "out": "gadget"
         }
       ]
     },
-    "par": 24
+    "par": 20
   }
 ]
