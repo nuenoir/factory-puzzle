@@ -51,17 +51,18 @@ Do not add dependencies without asking. This project should stay boring.
 
 ## Current phase
 
-**Phase 3 — generation and validation. This is the portfolio piece.**
+**Phase 4 — the daily loop. Rotation, streaks, sharing.**
 
-In scope right now: `packages/gen/` — a generator that proposes levels, and a validator that accepts or rejects them against four criteria. `docs/generation-spec.md` is authoritative for this phase the way `rules-spec.md` is for the simulator.
+In scope: picking one puzzle per day from a committed pool, remembering what the player has done, and letting them share a result. `app/` work, no new packages.
 
-**The rejection log is the deliverable, not a by-product.** The roadmap's gate is 50+ generated puzzles run through the validator with the breakdown written up. Log every rejection with its reason, in a form that can be counted.
+Explicitly **not** in scope, do not build these even if they seem quick:
 
-Explicitly **not** in scope yet, do not build these even if they seem quick:
+- Store assets, analytics, accounts (Phase 5)
+- A backend of any kind. There is no server and there is not going to be one — the daily puzzle is a pure function of the date, and history lives in the browser.
 
-- Daily rotation, sharing, streaks (Phase 4)
-- Store assets, analytics, accounts
-**Animation is in scope again** (reopened deliberately: the board read as dead, items teleported between ticks). It is **presentation only**. The simulator stays discrete and authoritative; the renderer interpolates between two consecutive snapshots. Never animate a guess, never let a tween decide anything the engine did not — what you watch must remain exactly what got scored.
+**Phase 3 is done and its numbers are published.** `docs/writeup.md` cites the 50-candidate batch from seed 1, so `artifacts/` and the four acceptance criteria are now load-bearing for a document that exists in the world. Changing a §8 criterion re-scores that batch and invalidates the write-up; if a daily-loop need seems to require it, the answer is almost always to curate at the Phase 4 layer instead. **The validator decides whether a puzzle is valid; the daily loop decides whether it is a good Tuesday.** Those are different questions and they get different code.
+
+**Animation is in scope** (reopened deliberately: the board read as dead, items teleported between ticks). It is **presentation only**. The simulator stays discrete and authoritative; the renderer interpolates between two consecutive snapshots. Never animate a guess, never let a tween decide anything the engine did not — what you watch must remain exactly what got scored.
 
 **Phases 1 and 2 are done.** `packages/sim/` passes all twelve §14 cases plus a `spec-invariants` suite, verified falsifiable by mutation testing. Treat it as settled: if generation wants a behaviour change, that is a spec change first (§15, then tests, then code) — not an edit to the simulator to make a search terminate.
 
@@ -69,7 +70,9 @@ The validator **is** `simulate`. That is why the simulator has no rendering impo
 
 The UI drives the sim through the §13 stepping API — `createWorld`, `step`, `snapshot` — not by calling `simulate` and animating a guess. `snapshot` is the render input.
 
-Level content lives in `levels/`. `levels/001.json` is the hand-designed fixture and the basis for most tests — see `docs/level-001.md` for why it's shaped the way it is.
+Level content lives in `levels/`. `levels/001.json` is the hand-designed fixture and the basis for most tests — see `docs/level-001.md` for why it's shaped the way it is. `levels/daily.json` is the rotation pool, generated rather than written; rebuild it with `scratchpad/build-daily-pool.ts` rather than editing it by hand.
+
+**Which puzzle a date maps to is a pure function and must stay one.** No clock reads inside it, no `Date.now()` buried in a helper — the date comes in as an argument so the mapping can be tested at any point in the rotation, including the day the pool wraps. Same rule as the simulator, same reason.
 
 ## Commands
 

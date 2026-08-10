@@ -30,7 +30,17 @@ import {
 import { Grid, type PointerPhase } from './components/Grid'
 import { Palette, type Tool } from './components/Palette'
 import { beltsFromPath, directionBetween, editReducer, placementAt } from './editor'
-import { level } from './puzzle'
+import { today } from './daily'
+
+/**
+ * The one clock read in the app.
+ *
+ * Resolved once at module scope rather than held in state: everything below
+ * treats the level as a constant, and a board that swapped itself out from
+ * under a half-built factory at midnight would be a worse bug than a session
+ * left open overnight showing yesterday's puzzle until it is reloaded.
+ */
+const { day, level } = today()
 import { colors } from './theme'
 
 type Status = 'idle' | 'running' | 'won' | 'jammed' | 'timeout'
@@ -241,7 +251,7 @@ export default function App() {
       <View style={styles.header}>
         <Text style={styles.title}>Factory Puzzle</Text>
         <Text style={styles.subtitle}>
-          Level {level.id} — deliver {level.target.count} {level.target.type}
+          Day {day} — deliver {level.target.count} {level.target.type}
         </Text>
       </View>
 
