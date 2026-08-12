@@ -32,6 +32,7 @@ import { Palette, type Tool } from './components/Palette'
 import { beltsFromPath, directionBetween, editReducer, ignoresCell, placementAt } from './editor'
 import { today } from './daily'
 import { loadHistory, record, resultFor, saveHistory, stats } from './history'
+import { copyShare, shareText } from './share'
 
 /**
  * The one clock read in the app.
@@ -97,6 +98,7 @@ export default function App() {
   // Read once. Nothing else writes this key, so re-reading would only ever
   // return what we last put there.
   const [history, setHistory] = useState(loadHistory)
+  const [copied, setCopied] = useState<'idle' | 'ok' | 'failed'>('idle')
 
   const solution = useMemo(() => ({ level_id: level.id, placements }), [placements])
   const cost = useMemo(() => costOf(solution), [solution])
@@ -355,7 +357,7 @@ export default function App() {
       </View>
 
       <View style={styles.controls}>
-        <Button label={playing ? 'Pause' : 'Run'} onPress={() => setPlaying((p) => !p)} disabled={!runnable || finished} primary />
+        <Button label={playing ? 'Pause' : 'Run'} testID="btn-run" onPress={() => setPlaying((p) => !p)} disabled={!runnable || finished} primary />
         <Button label="Step" onPress={advance} disabled={!runnable || playing || finished} />
         <Button label="Reset" onPress={rebuild} disabled={!runnable} />
         <Button label="Clear" onPress={() => dispatch({ kind: 'clear' })} disabled={placements.length === 0} />
@@ -380,6 +382,24 @@ export default function App() {
       </View>
 
       <Text style={[styles.status, statusTone(status)]}>{statusText(status, snap?.tick ?? 0, placements.length)}</Text>
+
+      {/* Offered whenever today is banked, not only in the moment of winning —
+          people come back to share, and a button that vanished on reload would
+          make the streak they are proud of unshareable. */}
+      {banked !== undefined ? (
+        <View style={styles.shareBox}>
+          <Text style={styles.shareCard} testID="share-card">{shareText(banked, summary.currentStreak)}</Text>
+          <Button
+            label={copied === 'ok' ? 'Copied' : copied === 'failed' ? 'Select and copy above' : 'Share'}
+            testID="btn-share"
+            onPress={async () => {
+              const ok = await copyShare(shareText(banked, summary.currentStreak))
+              setCopied(ok ? 'ok' : 'failed')
+            }}
+            primary={copied !== 'ok'}
+          />
+        </View>
+      ) : null}
     </ScrollView>
   )
 }
@@ -400,15 +420,19 @@ function Button({
   onPress,
   disabled,
   primary,
+  testID,
 }: {
   label: string
   onPress: () => void
   disabled?: boolean
   primary?: boolean
+  /** Given explicitly where the label changes with state — deriving the id from
+   *  the label means Run becomes btn-pause the moment it is pressed. */
+  testID?: string
 }) {
   return (
     <Pressable
-      testID={`btn-${label.toLowerCase()}`}
+      testID={testID ?? `btn-${label.toLowerCase()}`}
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
@@ -446,6 +470,26 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 24, fontWeight: '700' },
   subtitle: { color: colors.muted, fontSize: 13, marginTop: 2 },
   streak: { color: colors.good, fontSize: 12, fontWeight: '700', marginTop: 6, letterSpacing: 0.3 },
+  shareBox: {
+    marginTop: 18,
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.panel,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.panelEdge,
+    padding: 16,
+    maxWidth: 460,
+  },
+  shareCard: {
+    color: colors.text,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    // Shown as well as copied, so a refused clipboard still leaves something
+    // the player can select by hand.
+    fontVariant: ['tabular-nums'],
+  },
   errorBox: { backgroundColor: colors.panel, borderRadius: 10, padding: 16, maxWidth: 460 },
   errorTitle: { color: colors.bad, fontSize: 15, fontWeight: '700', marginBottom: 6 },
   errorLine: { color: colors.muted, fontSize: 12, marginTop: 2 },
