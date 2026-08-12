@@ -51,14 +51,16 @@ Do not add dependencies without asking. This project should stay boring.
 
 ## Current phase
 
-**Phase 4 — the daily loop. Rotation, streaks, sharing.**
-
-In scope: picking one puzzle per day from a committed pool, remembering what the player has done, and letting them share a result. `app/` work, no new packages.
+**Phase 4 is built.** Rotation, streaks, history and the share card all ship. What remains before it is *closed* is not code — see "The playtest gate" below.
 
 Explicitly **not** in scope, do not build these even if they seem quick:
 
 - Store assets, analytics, accounts (Phase 5)
 - A backend of any kind. There is no server and there is not going to be one — the daily puzzle is a pure function of the date, and history lives in the browser.
+
+**One Phase 4 item is deliberately unbuilt: the animated share.** The roadmap asks for "a short animation of the line running" alongside the score. It is not a small addition and it collides with two rules rather than one. There is nothing to host a file on, browser file-sharing is unreliable, and — the real blocker — the board is plain React Native `View`s by architectural rule, so there is no canvas to capture. Producing a clip means writing a second renderer purely for export, which contradicts the rendering rule *and* would need an encoder dependency, which needs asking. A text card was shipped instead because a text card is what actually gets pasted. Revisit only as a deliberate decision, not as a tidy-up.
+
+**The share card must never spoil the puzzle.** Cost and ticks are comparable; a building name, a level id or a cell coordinate is the answer. There is a test asserting the card contains none of them — do not "improve" the card past it.
 
 **Phase 3 is done and its numbers are published.** `docs/writeup.md` cites the 50-candidate batch from seed 1, so `artifacts/` and the four acceptance criteria are now load-bearing for a document that exists in the world. Changing a §8 criterion re-scores that batch and invalidates the write-up; if a daily-loop need seems to require it, the answer is almost always to curate at the Phase 4 layer instead. **The validator decides whether a puzzle is valid; the daily loop decides whether it is a good Tuesday.** Those are different questions and they get different code.
 
@@ -71,6 +73,14 @@ The validator **is** `simulate`. That is why the simulator has no rendering impo
 The UI drives the sim through the §13 stepping API — `createWorld`, `step`, `snapshot` — not by calling `simulate` and animating a guess. `snapshot` is the render input.
 
 Level content lives in `levels/`. `levels/001.json` is the hand-designed fixture and the basis for most tests — see `docs/level-001.md` for why it's shaped the way it is. `levels/daily.json` is the rotation pool, generated rather than written; rebuild it with `scratchpad/build-daily-pool.ts` rather than editing it by hand.
+
+## The playtest gate
+
+**Phase 2's gate was never met and it is now the oldest thing outstanding:** ten people play it, and three of them are watched playing *without being told anything first*. Nothing in `app/` can substitute for it.
+
+Take it seriously, because it has already cost something. A blanket guard made a belt drag unable to touch a source or sink, so **four levels in five could not be built at par** — the belt beside the sink kept whatever direction the drag was walking in, the factory ran, made its items and delivered none, and nothing on screen said why. It survived every automated check because level 001's reference solution parks the assembler *next to* the sink, so no belt ever runs into a fixture, and level 001 is what end-to-end checks had always used. One person playing one generated puzzle would have found it in a minute.
+
+The lesson generalises: **the fixture that makes tests convenient is also the fixture that makes them agree with each other.** Prefer a generated level from `levels/daily.json` when checking anything the player touches.
 
 **Which puzzle a date maps to is a pure function and must stay one.** No clock reads inside it, no `Date.now()` buried in a helper — the date comes in as an argument so the mapping can be tested at any point in the rotation, including the day the pool wraps. Same rule as the simulator, same reason.
 
