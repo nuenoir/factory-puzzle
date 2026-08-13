@@ -82,6 +82,12 @@ Take it seriously, because it has already cost something. A blanket guard made a
 
 The lesson generalises: **the fixture that makes tests convenient is also the fixture that makes them agree with each other.** Prefer a generated level from `levels/daily.json` when checking anything the player touches.
 
+`app/daily-loop.test.ts` closes that hole. It solves real pool puzzles with the real search, rebuilds each one **through the gesture layer** — taps and drags, not solver output — and insists the result wins. A mutation in `scratchpad/mutate.ps1` reintroduces the original guard and the suite goes red, so the bug cannot return quietly.
+
+That test is why two things came out of `App.tsx`: `gesture.ts` (what a touch does) and `run.ts` (what a tick means). Both were untestable inside a `useCallback`, which is how a seventy-line interaction shipped broken. **Keep new interaction logic out of the component** — if a test cannot replay it without a renderer, it will not be tested.
+
+`app` carries `@factory/gen` as a **devDependency**, for that test alone. The one-way rule that matters is that the shipped app never imports the generator; a test needing a real solution to a real puzzle is not that.
+
 **Which puzzle a date maps to is a pure function and must stay one.** No clock reads inside it, no `Date.now()` buried in a helper — the date comes in as an argument so the mapping can be tested at any point in the rotation, including the day the pool wraps. Same rule as the simulator, same reason.
 
 ## Commands

@@ -29,10 +29,12 @@ import {
 
 import { Grid, type PointerPhase } from './components/Grid'
 import { Palette, type Tool } from './components/Palette'
-import { beltsFromPath, directionBetween, editReducer, ignoresCell, placementAt } from './editor'
+import { editReducer } from './editor'
 import { today } from './daily'
 import { loadHistory, record, resultFor, saveHistory, stats } from './history'
 import { copyShare, shareText } from './share'
+import { statusAfterStep, type StepOutcome } from './run'
+import { onCell, type Drag } from './gesture'
 
 /**
  * The one clock read in the app.
@@ -45,7 +47,8 @@ import { copyShare, shareText } from './share'
 const { day, level } = today()
 import { colors } from './theme'
 
-type Status = 'idle' | 'running' | 'won' | 'jammed' | 'timeout'
+/** `idle` is a UI state — nothing has been stepped yet. The rest come from §10. */
+type Status = 'idle' | StepOutcome
 
 /** Milliseconds per tick at each speed. The tween fills exactly this long. */
 const SPEEDS = [
@@ -91,7 +94,7 @@ export default function App() {
   const tickMs = SPEEDS[speed].ms
 
   const worldRef = useRef<World | null>(null)
-  const drag = useRef<{ path: PosTuple[]; anchor: PosTuple | null; terminus: PosTuple | null } | null>(null)
+  const drag = useRef<Drag | null>(null)
   /** The cell under the finger, so the board can respond to being touched. */
   const [activeCell, setActiveCell] = useState<PosTuple | null>(null)
 
@@ -164,21 +167,16 @@ export default function App() {
     setProgress(hidden ? 1 : 0)
     setEpoch((e) => e + 1)
 
-    // §10: win is checked first, then the tick limit.
-    if ((world.delivered.get(level.target.type) ?? 0) >= level.target.count) {
-      setStatus('won')
-      setPlaying(false)
-      bank(world.tickCount)
-    } else if (world.tickCount >= level.max_ticks) {
-      setStatus('timeout')
-      setPlaying(false)
-    } else if (stateKey(world) === before) {
-      // §13: a fixpoint is permanent under determinism, so this is a real jam.
-      setStatus('jammed')
-      setPlaying(false)
-    } else {
-      setStatus('running')
-    }
+    const outcome = statusAfterStep({
+      delivered: world.delivered.get(level.target.type) ?? 0,
+      target: level.target.count,
+      tickCount: world.tickCount,
+      maxTicks: level.max_ticks,
+      stalled: stateKey(world) === before,
+    })
+    setStatus(outcome)
+    if (outcome !== 'running') setPlaying(false)
+    if (outcome === 'won') bank(world.tickCount)
   }, [])
 
   useEffect(() => {
@@ -211,79 +209,21 @@ export default function App() {
 
   const handleCell = useCallback(
     (phase: PointerPhase, x: number, y: number) => {
-      if (phase === 'up') {
-        drag.current = null
-        setActiveCell(null)
-        return
-      }
       const pos: PosTuple = [x, y]
-      setActiveCell(pos)
-      // Fixtures are immutable, but the belt tool may still use one as the end
-      // of a route — see `ignoresCell`. Guarding them all off here is what made
-      // four levels in five unbuildable at par: the belt beside the sink kept
-      // whatever direction the drag was walking in rather than turning to face
-      // it, and nothing on screen said why the factory never delivered.
-      const isFixture = fixtureCells.has(`${x},${y}`)
-      if (ignoresCell(tool, isFixture)) return
+      setActiveCell(phase === 'up' ? null : pos)
 
-      if (tool === 'delete') {
-        dispatch({ kind: 'remove', pos })
-        return
-      }
-
-      if (tool === 'conveyor') {
-        // A cell holding a machine or fixture cannot become a belt, but it can
-        // bookend one: drag out of a splitter and the first belt faces back at
-        // it; drag into an assembler and the last belt points at it.
-        const occupant = placementAt(placements, pos)
-        const isBuilding = isFixture || (occupant !== undefined && occupant.type !== 'conveyor')
-
-        if (phase === 'down') {
-          drag.current = isBuilding
-            ? { path: [], anchor: pos, terminus: null }
-            : { path: [pos], anchor: null, terminus: null }
-          if (!isBuilding) dispatch({ kind: 'placeMany', placements: beltsFromPath([pos]) })
-          return
-        }
-
-        const state = drag.current
-        if (!state || state.terminus) return
-        const ends = { anchor: state.anchor, terminus: null }
-
-        const last = state.path.length > 0 ? state.path[state.path.length - 1] : state.anchor
-        if (!last || (last[0] === x && last[1] === y)) return
-
-        if (isBuilding) {
-          if (state.path.length === 0) return
-          if (!directionBetween(last, pos)) return
-          state.terminus = pos
-          dispatch({ kind: 'placeMany', placements: beltsFromPath(state.path, { ...ends, terminus: pos }) })
-          return
-        }
-
-        // Dragging back onto the previous cell undoes the last step.
-        const previous = state.path.length >= 2 ? state.path[state.path.length - 2] : null
-        if (previous && previous[0] === x && previous[1] === y) {
-          state.path.pop()
-          dispatch({ kind: 'placeMany', placements: beltsFromPath(state.path, ends) })
-          return
-        }
-
-        // Ignore jumps (a fast drag) and self-crossings — a conveyor has one
-        // in and one out, so a path may not visit a cell twice.
-        if (!directionBetween(last, pos)) return
-        if (state.path.some((p) => p[0] === x && p[1] === y)) return
-
-        state.path.push(pos)
-        dispatch({ kind: 'placeMany', placements: beltsFromPath(state.path, ends) })
-        return
-      }
-
-      // Machines: tap an empty cell to place, tap your own building to turn it.
-      if (phase !== 'down') return
-      const existing = placementAt(placements, pos)
-      if (existing && existing.type === tool) dispatch({ kind: 'rotate', pos })
-      else dispatch({ kind: 'place', placement: { type: tool, pos, rotation } })
+      // All the actual reasoning lives in `gesture.ts`, where it can be replayed
+      // without a screen. It used to live here, which is why a guard that made
+      // four levels in five unbuildable could ship untested.
+      const outcome = onCell(phase, pos, {
+        tool,
+        rotation,
+        placements,
+        drag: drag.current,
+        isFixture: ([cx, cy]) => fixtureCells.has(`${cx},${cy}`),
+      })
+      drag.current = outcome.drag
+      for (const action of outcome.actions) dispatch(action)
     },
     [tool, rotation, placements],
   )

@@ -156,6 +156,18 @@ $mutations = @(
     to   = '  merger: 0,'
     kills = 'a merger costing something, which is why it can never be par'
   },
+  @{
+    file = 'app/editor.ts'
+    from = "return isFixture && tool !== 'conveyor'"
+    to   = 'return isFixture'
+    kills = 'letting a belt drag reach a sink (THIS is the four-in-five bug)'
+  },
+  @{
+    file = 'app/run.ts'
+    from = "  if (facts.delivered >= facts.target) return 'won'`n  if (facts.tickCount >= facts.maxTicks) return 'timeout'"
+    to   = "  if (facts.tickCount >= facts.maxTicks) return 'timeout'`n  if (facts.delivered >= facts.target) return 'won'"
+    kills = 'checking the win before the tick limit, per rules-spec 10'
+  },
   # The section-5 canonical form. Each of these is a different way of getting
   # "materially different" wrong, which is the project's headline claim.
   @{
