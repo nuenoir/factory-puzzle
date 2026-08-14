@@ -159,16 +159,33 @@ before a first build rather than debugging a confusing native failure after one.
 
 ---
 
-## Still open: the Metro config warning
+## The Metro config warning, settled
 
-- [ ] **`resolver.disableHierarchicalLookup` is `true`; expo-doctor expects
-      `false`.** It sits in `app/metro.config.js` as part of the npm-workspaces
-      setup that lets Metro find `@factory/sim` one level up, and it predates all
-      of the above. Left alone deliberately — expo-doctor's own advice is that
-      *"modifying the metro.config.js is dangerous"*, the bundler currently works
-      for both the dev server and the export, and now that every module hoists to
-      the workspace root the setting may simply be redundant rather than wrong.
-      Worth removing and re-testing both surfaces, but as its own change.
+- [x] **`resolver.disableHierarchicalLookup` removed.** It came from the older
+      Expo monorepo recipe. Turning hierarchical lookup off leaves the two
+      `nodeModulesPaths` entries as the *only* places Metro will look — a strict
+      subset of the default — and since every dependency hoists to the workspace
+      root, and that root is already listed, the setting was ruling things out
+      rather than ruling anything in.
+
+      Verified by building the web bundle with it on and with it off, back to
+      back: **byte-identical, same SHA**. The dev server was checked separately,
+      because that is the surface the setting most affects — board renders,
+      `@factory/sim` resolves, a machine places, belts draw by drag, a tick
+      advances, no console errors.
+
+      Worth recording how nearly this went wrong. The first comparison showed the
+      bundle 173 bytes *smaller* after the change, which looked like a real
+      difference; it was a stale Metro cache from the earlier `npm ci`. Rebuilding
+      both variants back to back under identical conditions is what settled it.
+      Ordinary caution about editing `metro.config.js` is why the check was worth
+      running twice.
+
+`expo-doctor` is now 20 of 21. The one remaining failure is `expo` and
+`@expo/metro-runtime` sitting one patch behind — and it is a moving target rather
+than a defect: Expo published new patches between fixing this yesterday and
+re-checking today. **Run `npx expo install --check` as the first step of building
+rather than trying to stay ahead of it.**
 
 ---
 

@@ -17,6 +17,14 @@ config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),
 ]
-config.resolver.disableHierarchicalLookup = true
+
+// `disableHierarchicalLookup` is deliberately *not* set. It used to be true,
+// from the older Expo monorepo recipe, and expo-doctor now flags that: turning
+// hierarchical lookup off leaves the two paths above as the only places Metro
+// will look, which is a strict subset of what it does by default. Since every
+// dependency hoists to the workspace root and that root is already listed, the
+// setting was ruling things out rather than ruling anything in. Removing it
+// leaves the exported bundle byte-identical, which is what says it was
+// redundant rather than load-bearing.
 
 module.exports = config
