@@ -126,29 +126,49 @@ nothing here can build or run an Android app.
 
 ---
 
-## Dependency issues to settle before the first build
+## Dependency issues, settled
 
-Found by `npx expo-doctor` while checking the config. Both are version changes,
-which CLAUDE.md says to ask about rather than make quietly, so they are recorded
-here instead of applied. Neither affects the web build or the suite; both affect
-a native build.
+Found by `npx expo-doctor` while checking the config, and now fixed.
+`expo-doctor` goes from 3 failures to 1.
 
-- [ ] **Duplicate `react` in the tree.** `app/package.json` pins `react` at
-      exactly `19.2.3`, while Expo's own packages resolve `19.2.8`, so npm keeps
-      both — one hoisted to the root and one under `app/`. expo-doctor is blunt
-      about why this matters: *"Native builds may only contain one version of any
-      given native module."* It predates `eas-cli` and has been harmless while the
-      target was the web. The fix is to move the pin to whatever Expo resolves so
-      the two dedupe.
+- [x] **Duplicate `react` in the tree.** Expo's packages declare `react` as a peer
+      of `*`, so npm auto-installed the newest it could find (19.2.8) and left the
+      app's exact `19.2.3` pin as a second, separate copy. expo-doctor is blunt
+      about why that matters: *"Native builds may only contain one version of any
+      given native module."*
 
-- [ ] **Two packages behind what SDK 57 expects.** `expo@57.0.9` against `~57.0.12`
-      and `@expo/metro-runtime@57.0.8` against `~57.0.9` — patch versions, flagged
-      by `npx expo install --check`, fixed by running it without `--check`.
+      Fixed with an `overrides` block at the workspace root forcing `react` and
+      `react-dom` to **19.2.3** — the version SDK 57 actually expects — so the
+      tree dedupes *and* matches Expo's tested combination. Pinning the app to
+      19.2.8 instead would also have deduped, but would have put the project five
+      patches ahead of the React that Expo tested against, on the one surface
+      nothing here can verify.
 
-Doing both is routine and low-risk, and the suite plus a browser pass would cover
-the web surface. The Android surface would still be unverified either way, which
-is the argument for doing it *before* a first build rather than debugging a
-confusing native failure afterwards.
+      npm will not apply a new `overrides` block while it considers the tree
+      satisfied; the lockfile entries for the two packages have to be dropped so
+      it re-resolves. `npm ci` then reproduces the deduped tree, which is what CI
+      runs.
+
+- [x] **Two packages behind what SDK 57 expects.** `expo` 57.0.9 → `~57.0.12`,
+      `@expo/metro-runtime` 57.0.8 → `~57.0.9`, via `npx expo install`.
+
+Verified after both: typecheck clean, 277 tests, web build exports, and the board
+still places machines, draws belts by drag and advances a tick in the browser.
+The Android surface remains unverified, which was the argument for doing this
+before a first build rather than debugging a confusing native failure after one.
+
+---
+
+## Still open: the Metro config warning
+
+- [ ] **`resolver.disableHierarchicalLookup` is `true`; expo-doctor expects
+      `false`.** It sits in `app/metro.config.js` as part of the npm-workspaces
+      setup that lets Metro find `@factory/sim` one level up, and it predates all
+      of the above. Left alone deliberately — expo-doctor's own advice is that
+      *"modifying the metro.config.js is dangerous"*, the bundler currently works
+      for both the dev server and the export, and now that every module hoists to
+      the workspace root the setting may simply be redundant rather than wrong.
+      Worth removing and re-testing both surfaces, but as its own change.
 
 ---
 

@@ -14,6 +14,11 @@
     "build:web": "npm run build:web --workspace app",
     "generate": "node --experimental-strip-types packages/gen/src/cli.ts"
   },
+  "//overrides": "Expo's packages declare react as a peer of `*`, so npm installs the newest it can find and the app's exact pin ends up a second, separate copy. Native builds may contain only one version of a native module, so the tree is forced to the single version Expo SDK 57 expects. Raise these together with the SDK, never on their own.",
+  "overrides": {
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
   "devDependencies": {
     "eas-cli": "^21.8.0",
     "typescript": "^7.0.2",
