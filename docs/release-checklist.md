@@ -115,13 +115,40 @@ nothing here can build or run an Android app.
       secure context and a user gesture; the failure path shows the text for
       manual copying and is verified, the success path has only been verified with
       the write stubbed, because a synthetic click cannot grant the permission.
-- [ ] **`userInterfaceStyle`** is still `'light'` while the board is dark. That
-      declaration is about which appearances the app supports, and on Android it
-      can invite the system's forced-dark treatment. Probably wants `'dark'`, and
-      it is left alone because changing it blind trades a cosmetic doubt for an
-      untested one. Look at it on a real device.
+- [ ] **`userInterfaceStyle: 'dark'`** — now set, since the board has one fixed
+      palette and never reads the system scheme, so the old `'light'` described an
+      appearance the app never has. Web output is unchanged (it is an Android
+      setting) and the board still renders clean. What is *not* confirmed is the
+      thing it exists for: that Android stops applying forced-dark to an already
+      dark surface. Look at the greens on a real device.
 - [ ] **The generated icon at real sizes.** It was checked at 1024²; the shape is
       simple enough to survive 48px but that is a prediction, not an observation.
+
+---
+
+## Dependency issues to settle before the first build
+
+Found by `npx expo-doctor` while checking the config. Both are version changes,
+which CLAUDE.md says to ask about rather than make quietly, so they are recorded
+here instead of applied. Neither affects the web build or the suite; both affect
+a native build.
+
+- [ ] **Duplicate `react` in the tree.** `app/package.json` pins `react` at
+      exactly `19.2.3`, while Expo's own packages resolve `19.2.8`, so npm keeps
+      both — one hoisted to the root and one under `app/`. expo-doctor is blunt
+      about why this matters: *"Native builds may only contain one version of any
+      given native module."* It predates `eas-cli` and has been harmless while the
+      target was the web. The fix is to move the pin to whatever Expo resolves so
+      the two dedupe.
+
+- [ ] **Two packages behind what SDK 57 expects.** `expo@57.0.9` against `~57.0.12`
+      and `@expo/metro-runtime@57.0.8` against `~57.0.9` — patch versions, flagged
+      by `npx expo install --check`, fixed by running it without `--check`.
+
+Doing both is routine and low-risk, and the suite plus a browser pass would cover
+the web surface. The Android surface would still be unverified either way, which
+is the argument for doing it *before* a first build rather than debugging a
+confusing native failure afterwards.
 
 ---
 
