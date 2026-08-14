@@ -15,6 +15,7 @@
     "generate": "node --experimental-strip-types packages/gen/src/cli.ts"
   },
   "devDependencies": {
+    "eas-cli": "^21.8.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   }

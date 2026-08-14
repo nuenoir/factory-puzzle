@@ -43,6 +43,29 @@ been shipping happily through a green suite.
       integer; it must rise on every upload and can never be reused, including
       after a rejected build.
 - [x] **`permissions: []`** declared explicitly rather than left to inference.
+- [x] **`version` set to `1.0.0`.** It was `0.0.0`, which is only a label but
+      reads as abandoned on a store page. `versionCode` is the number Play
+      actually orders by.
+- [x] **`eas-cli` installed** as a root devDependency (v21.8.0), so the version is
+      pinned and reproducible rather than whatever happens to be on the machine —
+      EAS builds are sensitive to it. It costs about 190 extra packages in
+      `node_modules`, and CI installs them without using them.
+- [x] **`eas.json`** with two profiles: `preview` builds an **APK** for
+      sideloading to yourself or a tester directly, `production` builds an **AAB**,
+      which is what Play requires. `appVersionSource: "local"` keeps `versionCode`
+      in `app.config.js` rather than letting EAS increment it remotely — one place
+      to look, no surprises between a local config and a dashboard.
+- [x] **Icons generated** — `app/assets/icon.png` (1024², opaque, as Play requires)
+      and `adaptive-icon.png` (1024², transparent foreground). Drawn by
+      `scratchpad/make-icon.ts` in pure Node: a PNG is a signature, an IHDR, a
+      deflated block of scanlines and an IEND, and `zlib` ships with Node, so no
+      image dependency was needed for one flat shape. The mark is the board's own
+      hexagon in the board's own green, and the adaptive foreground is drawn at
+      56% so a circular or squircle mask cannot clip it.
+
+      They are honest placeholders and they look it — one shape, flat colour.
+      Legitimate for a closed test; the public listing still deserves a design
+      pass, and the feature graphic is not something a script should invent.
 
 ---
 
@@ -53,14 +76,18 @@ scripted from here.
 
 - [ ] **Play Console developer account** — one-off fee, identity verification.
       Verification has taken people days; start it before you need it.
-- [ ] **Expo account and `eas-cli`** to produce an Android build. This is a new
-      dependency and a login, which is why it has not been added: CLAUDE.md says
-      do not add dependencies without asking. Say the word and it goes in.
+- [ ] **`eas login`.** The CLI is installed and configured, but every command
+      that touches a build needs an Expo account. `eas config` was run here to
+      validate the setup and stopped exactly there, so the config is unverified
+      past the point where a login is required.
+- [ ] **`eas build --platform android --profile production`.** Nothing in this
+      environment can build or run an Android app, so this has never executed.
+      Expect the first run to ask about signing.
 - [ ] **Upload keystore.** Let Play manage signing and keep the upload key
       backed up somewhere that is not only this laptop. Losing it means never
       updating this listing again under this package name.
-- [ ] **Icon and feature graphic.** Artwork, not copy — see the sizes in the
-      listing doc. A generated placeholder would be worse than a plain one.
+- [ ] **Feature graphic** (1024×500). Artwork, not copy. The icons are generated
+      placeholders; this one a script has no business inventing.
 - [ ] **Screenshots.** Take them from the web build at a phone viewport, of a
       *solved* factory with items on the belts.
 - [ ] **Recruit 12 testers** and get them to opt in. See the dependency above.
@@ -88,6 +115,13 @@ nothing here can build or run an Android app.
       secure context and a user gesture; the failure path shows the text for
       manual copying and is verified, the success path has only been verified with
       the write stubbed, because a synthetic click cannot grant the permission.
+- [ ] **`userInterfaceStyle`** is still `'light'` while the board is dark. That
+      declaration is about which appearances the app supports, and on Android it
+      can invite the system's forced-dark treatment. Probably wants `'dark'`, and
+      it is left alone because changing it blind trades a cosmetic doubt for an
+      untested one. Look at it on a real device.
+- [ ] **The generated icon at real sizes.** It was checked at 1024²; the shape is
+      simple enough to survive 48px but that is a prediction, not an observation.
 
 ---
 
