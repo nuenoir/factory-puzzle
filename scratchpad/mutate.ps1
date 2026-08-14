@@ -163,6 +163,24 @@ $mutations = @(
     kills = 'letting a belt drag reach a sink (THIS is the four-in-five bug)'
   },
   @{
+    file = 'app/trace.ts'
+    from = 'if (!Number.isFinite(tick) || tick < 1) continue'
+    to   = ''
+    kills = 'ignoring delivery ticks that cannot have happened'
+  },
+  @{
+    file = 'app/trace.ts'
+    from = 'const span = Math.max(1, totalTicks)'
+    to   = 'const span = totalTicks'
+    kills = 'guarding the trace against a zero-tick run'
+  },
+  @{
+    file = 'app/trace.ts'
+    from = 'Math.floor(((tick - 1) / span) * width)'
+    to   = 'Math.floor((tick / span) * width)'
+    kills = 'placing 1-based ticks in the right segment'
+  },
+  @{
     file = 'app/run.ts'
     from = "  if (facts.delivered >= facts.target) return 'won'`n  if (facts.tickCount >= facts.maxTicks) return 'timeout'"
     to   = "  if (facts.tickCount >= facts.maxTicks) return 'timeout'`n  if (facts.delivered >= facts.target) return 'won'"

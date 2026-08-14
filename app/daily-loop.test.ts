@@ -55,6 +55,7 @@ import {
 } from './history'
 import { statusAfterStep, type StepOutcome } from './run'
 import { shareText } from './share'
+import { TRACE_WIDTH, deliveryTrace } from './trace'
 
 /** In-memory stand-in for localStorage, so persistence is real but contained. */
 function fakeStore(): Store & { data: Record<string, string> } {
@@ -66,14 +67,23 @@ function fakeStore(): Store & { data: Record<string, string> } {
  * Play a solution the way the board plays it: step, then decide, using the same
  * function the component uses rather than a copy of its reasoning.
  */
-function play(level: Level, solution: Solution): { outcome: StepOutcome; ticks: number; cost: number } {
+function play(
+  level: Level,
+  solution: Solution,
+): { outcome: StepOutcome; ticks: number; cost: number; deliveredAt: number[] } {
   const built = createWorld(level, solution)
   if (!built.ok) throw new Error(`world would not build: ${built.errors.map((e) => e.message).join('; ')}`)
   const world = built.world
+  const deliveredAt: number[] = []
 
   for (;;) {
     const before = stateKey(world)
+    const deliveredBefore = world.delivered.get(level.target.type) ?? 0
     step(world)
+    // Collected as the run happens, the way the board does it — a trace
+    // re-derived afterwards would not be evidence of the run that was scored.
+    const deliveredNow = world.delivered.get(level.target.type) ?? 0
+    for (let i = deliveredBefore; i < deliveredNow; i += 1) deliveredAt.push(world.tickCount)
     const outcome = statusAfterStep({
       delivered: world.delivered.get(level.target.type) ?? 0,
       target: level.target.count,
@@ -85,7 +95,7 @@ function play(level: Level, solution: Solution): { outcome: StepOutcome; ticks: 
       // `snapshot` is the render input; touching it here keeps this honest about
       // going through the same surface the board does.
       snapshot(world)
-      return { outcome, ticks: world.tickCount, cost: costOf(solution) }
+      return { outcome, ticks: world.tickCount, cost: costOf(solution), deliveredAt }
     }
   }
 }
@@ -114,6 +124,7 @@ describe('the daily loop, end to end', () => {
       par: level.par,
       cost: played.cost,
       ticks: played.ticks,
+      deliveredAt: played.deliveredAt,
     })
     expect(saveHistory(history, store)).toBe(true)
 
@@ -126,6 +137,7 @@ describe('the daily loop, end to end', () => {
       par: level.par,
       cost: played.cost,
       ticks: played.ticks,
+      deliveredAt: played.deliveredAt,
     })
     expect(currentStreak(reloaded, day)).toBe(1)
   })
@@ -147,6 +159,7 @@ describe('the daily loop, end to end', () => {
         par: level.par,
         cost: played.cost,
         ticks: played.ticks,
+        deliveredAt: played.deliveredAt,
       })
       saveHistory(history, store)
     }
@@ -162,6 +175,12 @@ describe('the daily loop, end to end', () => {
     const card = shareText(resultFor(reloaded, today)!, summary.currentStreak)
     expect(card).toContain(`#${today}`)
     expect(card).toContain('3 day streak')
+    // And the run trace, standing in for the animation: one mark per delivery,
+    // from ticks collected while the factory actually ran.
+    const banked = resultFor(reloaded, today)!
+    expect(banked.deliveredAt).toHaveLength(puzzleFor(today).target.count)
+    expect(card).toContain(deliveryTrace(banked.deliveredAt!, banked.ticks))
+    expect(card.split('\n').some((line) => line.length === TRACE_WIDTH && /^[▁█]+$/.test(line))).toBe(true)
     // Still no spoilers, now that the numbers came from a real factory.
     for (const spoiler of ['press', 'splitter', 'assembler', 'conveyor', 'gen-']) {
       expect(card.toLowerCase()).not.toContain(spoiler)
@@ -186,6 +205,7 @@ describe('the daily loop, end to end', () => {
       par: level.par,
       cost: played.cost,
       ticks: played.ticks,
+      deliveredAt: played.deliveredAt,
     })
     expect(resultFor(history, wrap)?.levelId).toBe(level.id)
     expect(currentStreak(history, wrap)).toBe(1)
@@ -206,6 +226,7 @@ describe('the daily loop, end to end', () => {
       par: level.par,
       cost: played.cost,
       ticks: played.ticks,
+      deliveredAt: played.deliveredAt,
     })
     const result = resultFor(banked, 2)!
     // A pretend rebuild that moves day 2 to some other puzzle entirely.

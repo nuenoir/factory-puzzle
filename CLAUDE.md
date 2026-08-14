@@ -58,7 +58,17 @@ Explicitly **not** in scope, do not build these even if they seem quick:
 - Store assets, analytics, accounts (Phase 5)
 - A backend of any kind. There is no server and there is not going to be one — the daily puzzle is a pure function of the date, and history lives in the browser.
 
-**One Phase 4 item is deliberately unbuilt: the animated share.** The roadmap asks for "a short animation of the line running" alongside the score. It is not a small addition and it collides with two rules rather than one. There is nothing to host a file on, browser file-sharing is unreliable, and — the real blocker — the board is plain React Native `View`s by architectural rule, so there is no canvas to capture. Producing a clip means writing a second renderer purely for export, which contradicts the rendering rule *and* would need an encoder dependency, which needs asking. A text card was shipped instead because a text card is what actually gets pasted. Revisit only as a deliberate decision, not as a tidy-up.
+**The roadmap's "short animation of the line running" ships as a text trace, not a clip.** A literal clip is blocked by an architectural rule, not by effort: the board is plain React Native `View`s, so there is no canvas to capture, and producing one means a second renderer existing only for export — free to drift from the real board — plus an encoder dependency and somewhere to host the file, of which there is none.
+
+What the animation would *say* is how the factory ran: the pause while it fills, then the beat of deliveries. That is a list of tick numbers, and it fits on one line that pastes anywhere and spoils nothing (`app/trace.ts`):
+
+```
+▁▁▁▁▁▁▁▁▁▁█▁█▁█▁▁█▁█
+```
+
+Both glyphs come from the block-elements range so the bar cannot stagger in a font nobody controls. The ticks are collected **during the scored run** and stored on the result — never re-derived afterwards, for the same reason the renderer never animates a guess. `Result.deliveredAt` is optional and additive so records banked before it existed still load; do not bump the schema version for a field that can simply be absent.
+
+A real clip remains possible and remains a deliberate decision — it costs a second renderer and a dependency, and both need asking.
 
 **The share card must never spoil the puzzle.** Cost and ticks are comparable; a building name, a level id or a cell coordinate is the answer. There is a test asserting the card contains none of them — do not "improve" the card past it.
 

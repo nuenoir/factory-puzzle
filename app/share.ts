@@ -12,6 +12,7 @@
  */
 
 import type { Result } from './history'
+import { deliveryTrace } from './trace'
 
 /** Where a reader goes to play the same day. No tracking parameters. */
 export const PLAY_URL = 'nuenoir.github.io/factory-puzzle'
@@ -37,6 +38,12 @@ export function scoreLine(result: Result): string {
  */
 export function shareText(result: Result, streak: number): string {
   const lines = [`⬢ Factory Puzzle #${result.day}`, scoreLine(result)]
+  // The run itself, when the result carries one. Standing in for the animation
+  // the roadmap wanted: the pause while the factory fills, then the beat of
+  // deliveries. Absent on results banked before the trace existed.
+  if (result.deliveredAt !== undefined && result.deliveredAt.length > 0) {
+    lines.push(deliveryTrace(result.deliveredAt, result.ticks))
+  }
   if (streak >= 2) lines.push(`${streak} day streak`)
   lines.push(PLAY_URL)
   return lines.join('\n')

@@ -94,6 +94,8 @@ export default function App() {
   const tickMs = SPEEDS[speed].ms
 
   const worldRef = useRef<World | null>(null)
+  /** Ticks on which a target item reached the sink, for the share trace. */
+  const deliveredAt = useRef<number[]>([])
   const drag = useRef<Drag | null>(null)
   /** The cell under the finger, so the board can respond to being touched. */
   const [activeCell, setActiveCell] = useState<PosTuple | null>(null)
@@ -122,6 +124,9 @@ export default function App() {
         par: level.par,
         cost: costRef.current,
         ticks,
+        // Collected tick by tick as the run happened, so the trace on the share
+        // card is of the run that was scored rather than a re-derivation of it.
+        deliveredAt: [...deliveredAt.current],
       })
       if (next !== previousHistory) saveHistory(next)
       return next
@@ -142,6 +147,8 @@ export default function App() {
     }
     setErrors([])
     worldRef.current = built.world
+    // Any edit rewinds the run, so the trace has to start over with it.
+    deliveredAt.current = []
     setSnap(snapshot(built.world))
     setPrevious(null)
     setProgress(1)
@@ -154,8 +161,12 @@ export default function App() {
     if (!world) return
 
     const before = stateKey(world)
+    const deliveredBefore = world.delivered.get(level.target.type) ?? 0
     const wasShowing = snapshot(world)
     step(world)
+    // One entry per item, since a tick can deliver more than one.
+    const deliveredNow = world.delivered.get(level.target.type) ?? 0
+    for (let i = deliveredBefore; i < deliveredNow; i += 1) deliveredAt.current.push(world.tickCount)
     setPrevious(wasShowing)
     setSnap(snapshot(world))
     // Restart the tween from the top of this tick. A hidden tab gets no

@@ -25,6 +25,14 @@ export interface Result {
   /** What they solved it at. Golf: lower is better, and par is beatable. */
   readonly cost: number
   readonly ticks: number
+  /**
+   * The tick each delivery landed on, for the share card's run trace.
+   *
+   * Optional, and additive on purpose: records written before this existed stay
+   * readable and simply have no trace, which is a better outcome than bumping
+   * the schema version and throwing away everyone's streak.
+   */
+  readonly deliveredAt?: readonly number[]
 }
 
 export interface History {
@@ -169,7 +177,20 @@ export function parseHistory(raw: string | null): History {
     // The key is what every lookup goes through, so a record that disagrees
     // with its own key is unusable however well-formed it otherwise looks.
     if (key !== String(r.day)) continue
-    clean[key] = { day: r.day as number, levelId: r.levelId, par: r.par as number, cost: r.cost as number, ticks: r.ticks as number }
+    // Absent on records written before the trace existed; dropped wholesale if
+    // it is not a clean list of numbers, since a partial trace would draw a lie.
+    const deliveredAt =
+      Array.isArray(r.deliveredAt) && r.deliveredAt.every((n) => typeof n === 'number' && Number.isFinite(n))
+        ? (r.deliveredAt as number[])
+        : undefined
+    clean[key] = {
+      day: r.day as number,
+      levelId: r.levelId,
+      par: r.par as number,
+      cost: r.cost as number,
+      ticks: r.ticks as number,
+      ...(deliveredAt === undefined ? {} : { deliveredAt }),
+    }
   }
   return { version: 1, results: clean }
 }
