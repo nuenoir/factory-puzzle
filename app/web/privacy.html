@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Factory Puzzle — Privacy Policy</title>
+<style>
+  :root {
+    --ground: #12141a;
+    --panel: #1b1e27;
+    --edge: #272b38;
+    --text: #f4f6fb;
+    --muted: #8b93a7;
+    --good: #4ade80;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --ground: #fbfbfd; --panel: #f1f3f8; --edge: #dce0e9; --text: #14161c; --muted: #545b6c; --good: #157f3c; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 3rem 1.25rem 5rem;
+    background: var(--ground);
+    color: var(--text);
+    font: 16px/1.65 ui-serif, "Iowan Old Style", Georgia, serif;
+  }
+  main { max-width: 62ch; margin-inline: auto; }
+  h1 {
+    font: 600 1.6rem/1.2 ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+    letter-spacing: -0.02em;
+    margin: 0 0 .4rem;
+  }
+  .updated { color: var(--muted); font-size: .82rem; font-family: ui-monospace, Menlo, monospace; margin: 0 0 2.2rem; }
+  h2 {
+    font: 600 1rem/1.3 ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+    margin: 2.2rem 0 .7rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--edge);
+  }
+  p { margin: 0 0 1rem; }
+  ul { margin: 0 0 1rem; padding-left: 1.2rem; }
+  li { margin-bottom: .4rem; }
+  strong { color: var(--good); }
+  .summary {
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-left: 3px solid var(--good);
+    border-radius: 6px;
+    padding: 1rem 1.2rem;
+    margin: 0 0 2rem;
+  }
+  .summary p { margin: 0; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .88em; }
+  a { color: inherit; text-decoration-color: var(--good); text-underline-offset: 3px; }
+  footer { margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--edge); color: var(--muted); font-size: .8rem; font-family: ui-monospace, Menlo, monospace; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Factory Puzzle — Privacy Policy</h1>
+  <p class="updated">Last updated 14 August 2026</p>
+
+  <div class="summary">
+    <p><strong>Factory Puzzle collects no personal data, sends nothing anywhere, and has no accounts, adverts or analytics.</strong> Your puzzle history stays on your own device. Everything below is detail on that.</p>
+  </div>
+
+  <h2>What the app stores</h2>
+  <p>When you solve a daily puzzle, the app saves a small record on your device so it can show your streak next time you open it. Each record holds:</p>
+  <ul>
+    <li>the day number of the puzzle</li>
+    <li>which puzzle it was, and that puzzle's par</li>
+    <li>what you solved it for, and how many ticks your factory took</li>
+    <li>the ticks on which items reached the sink, which draws the bar on the share card</li>
+  </ul>
+  <p>That is the whole record. There is no name, no email, no device identifier and nothing that identifies you.</p>
+  <p>It is kept in your browser's own local storage under the key <code>factory-puzzle:history:v1</code>. Clearing your browser data, or the app's storage on Android, erases it permanently. There is no copy anywhere else, so there is nothing for us to delete on your behalf and no way for us to restore it.</p>
+
+  <h2>What the app sends</h2>
+  <p>Nothing. The app makes no network requests of any kind. It contains no analytics, no crash reporting, no advertising identifiers and no third-party tracking libraries. The puzzles are built into the app, and which puzzle belongs to which day is worked out on your device from the date.</p>
+  <p>Sharing a result copies a few lines of text to your clipboard. Where that text goes afterwards is entirely up to you — the app does not send it and does not know whether you pasted it.</p>
+
+  <h2>Permissions</h2>
+  <p>The Android app requests no permissions. It does not use the camera, microphone, location, contacts, files or network.</p>
+
+  <h2>Children</h2>
+  <p>The app collects no data from anyone, of any age. It contains no adverts, no purchases, no chat and no user-generated content.</p>
+
+  <h2>The website</h2>
+  <p>The web version is hosted on GitHub Pages. Like any web host, GitHub's servers record ordinary request information such as IP addresses in their own logs; that is GitHub's processing rather than the app's, and it is covered by
+  <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub's privacy statement</a>. The app itself still sends nothing and sets no cookies.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy ever changes, the date at the top changes with it. The app's full source is public, so any claim here can be checked against the code rather than taken on trust.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about this policy can be raised as an issue on the project's
+  <a href="https://github.com/nuenoir/factory-puzzle/issues">GitHub repository</a>.</p>
+
+  <footer>
+    Source: <a href="https://github.com/nuenoir/factory-puzzle">github.com/nuenoir/factory-puzzle</a> ·
+    <a href="./">Play Factory Puzzle</a>
+  </footer>
+</main>
+</body>
+</html>

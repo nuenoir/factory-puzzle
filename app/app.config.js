@@ -20,6 +20,21 @@ module.exports = {
     },
     android: {
       package: 'com.bagus.factorypuzzle',
+      // Play orders releases by this integer, not by `version`. It must rise on
+      // every upload and can never be reused, even after a rejected build.
+      versionCode: 1,
+      /**
+       * Declared empty on purpose, not left to inference: the app uses no
+       * camera, location, storage or anything else Play asks about.
+       *
+       * The React Native template still adds INTERNET, which this app never
+       * uses — it makes no requests, bundles its puzzles, and computes the daily
+       * mapping on device. Removing it via `blockedPermissions` is the right end
+       * state and is *not* done here, because it cannot be verified without a
+       * real device build and a config that breaks the runtime is worse than one
+       * that over-declares. See docs/release-checklist.md.
+       */
+      permissions: [],
     },
     experiments: {
       baseUrl: process.env.EXPO_BASE_URL ?? '',

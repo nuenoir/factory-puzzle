@@ -33,6 +33,11 @@ jobs:
         env:
           # Project sites live at /<repo>/, so assets need that prefix.
           EXPO_BASE_URL: /${{ github.event.repository.name }}
+      # Static pages that sit alongside the app rather than inside it. The Play
+      # listing needs a privacy policy at a stable URL, and this is the only
+      # host in the project — so the deploy has to carry it or the store link
+      # dies the next time the bundle is rebuilt.
+      - run: cp app/web/privacy.html app/dist/privacy.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
