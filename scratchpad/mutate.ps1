@@ -232,6 +232,26 @@ $mutations = @(
     to   = '  if (idleSources.length > 0) {'
     kills = 'leaving a spare source alone on a two-source level (THIS is the 74-level bug)'
   },
+  # Same shape a third time: a machine whose inputs are alternatives rather than
+  # requirements. rules-spec section 14 case 12 is *named* "merger starvation".
+  @{
+    file = 'app/coach.ts'
+    from = "    return b.type === 'merger' ? unfed.length === b.inPorts.length : true"
+    to   = '    return true'
+    kills = 'letting half a merger be a waste of money rather than a fault'
+  },
+  @{
+    file = 'app/editor.ts'
+    from = "  if (tool === 'delete' || available.includes(tool)) return tool"
+    to   = '  return tool'
+    kills = 'dropping a tool the level being switched to does not offer'
+  },
+  @{
+    file = 'app/tutorial.ts'
+    from = "    text: 'Choose BELT and run one from the press into the sink."
+    to   = "    text: 'Now run one from the press into the sink."
+    kills = 'naming the tool in a step that places something'
+  },
   @{
     file = 'app/tutorial.ts'
     from = '    if (n.x === to.x && n.y === to.y) return to.inPorts.includes(opposite(d))'
