@@ -21,6 +21,7 @@ import {
   snapshot,
   stateKey,
   step,
+  type Placement,
   type PosTuple,
   type Rotation,
   type Level,
@@ -293,22 +294,36 @@ export default function App() {
   const board = useMemo(() => ({ snapshot: snap, status }), [snap, status])
   const tutorialStep = mode === 'tutorial' ? currentStep(board) : null
 
+  /**
+   * Today's board, held while the tutorial borrows the screen.
+   *
+   * The two levels are different sizes, so the boards cannot simply coexist —
+   * daily placements on the tutorial's 5x3 grid are out of bounds and the world
+   * refuses to build. Clearing is therefore forced, but the cost of it need not
+   * land on the player: you get one puzzle a day, and losing a half-built
+   * factory to a curious tap on "How to play" is a bad trade for a reminder.
+   */
+  const [stash, setStash] = useState<readonly Placement[]>([])
+
   /** Leave the tutorial for today's puzzle, and do not offer it again. */
   const leaveTutorial = useCallback(() => {
     markTutorialDone()
     dispatch({ kind: 'clear' })
+    if (stash.length > 0) dispatch({ kind: 'placeMany', placements: stash })
+    setStash([])
     setMode('daily')
-  }, [])
+  }, [stash])
 
   /**
    * Back to the tutorial. Reachable at any time, because the rule it teaches is
-   * the one people forget, and there is nothing to lose by re-reading it —
-   * today's progress is banked on the win, not on the board being left alone.
+   * the one people forget — and now genuinely free, since today's board comes
+   * back exactly as it was left.
    */
   const replayTutorial = useCallback(() => {
+    setStash(placements)
     dispatch({ kind: 'clear' })
     setMode('tutorial')
-  }, [])
+  }, [placements])
 
   return (
     <ScrollView contentContainerStyle={styles.screen}>

@@ -193,3 +193,41 @@ describe('ignoresCell', () => {
     expect(walkingOn[1].out).not.toBe('E')
   })
 })
+
+describe('handing the board back', () => {
+  /**
+   * The tutorial and the daily puzzle are different sizes, so their boards
+   * cannot coexist — daily placements on the tutorial's 5x3 grid are out of
+   * bounds and the world refuses to build. Switching therefore has to clear.
+   *
+   * What must not happen is the player paying for that: you get one puzzle a
+   * day, and losing a half-built factory to a curious tap on "How to play" is a
+   * bad trade for a reminder. App.tsx stashes the placements and replays them
+   * as `clear` then `placeMany`, so this pins the mechanism that makes the
+   * round trip lossless. It does not pin the wiring — that needs a renderer —
+   * but it does catch the two dispatches being "simplified" into one.
+   */
+  it('restores a stashed board exactly, through clear then placeMany', () => {
+    const daily: Placement[] = [
+      { type: 'conveyor', pos: [0, 2], in: 'W', out: 'E' },
+      { type: 'conveyor', pos: [1, 2], in: 'W', out: 'E' },
+      { type: 'press', pos: [3, 2], rotation: 0 },
+    ]
+    const cleared = editReducer(daily, { kind: 'clear' })
+    expect(cleared).toEqual([])
+
+    const restored = editReducer(cleared, { kind: 'placeMany', placements: daily })
+    expect(restored).toEqual(daily)
+  })
+
+  it('does not carry the tutorial board into the daily one', () => {
+    // The tutorial's own placements are disposable; only the stash comes back.
+    const tutorialBoard: Placement[] = [{ type: 'conveyor', pos: [1, 1], in: 'W', out: 'E' }]
+    const daily: Placement[] = [{ type: 'press', pos: [3, 2], rotation: 0 }]
+    const restored = editReducer(editReducer(tutorialBoard, { kind: 'clear' }), {
+      kind: 'placeMany',
+      placements: daily,
+    })
+    expect(restored).toEqual(daily)
+  })
+})
