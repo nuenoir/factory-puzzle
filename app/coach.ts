@@ -271,11 +271,24 @@ export function nextHint(input: CoachInput): Hint | null {
     }
   }
 
-  const starved = built.find((b) => MACHINES.has(b.type) && b.inPorts.some((d) => {
-    const n = neighbourOf(b.x, b.y, d)
-    const other = snapshot.buildings.find((o) => o.x === n.x && o.y === n.y)
-    return other === undefined || !connects(other, b)
-  }))
+  const starved = built.find((b) => {
+    if (!MACHINES.has(b.type)) return false
+    const unfed = b.inPorts.filter((d) => {
+      const n = neighbourOf(b.x, b.y, d)
+      const other = snapshot.buildings.find((o) => o.x === n.x && o.y === n.y)
+      return other === undefined || !connects(other, b)
+    })
+    if (unfed.length === 0) return false
+    // A merger's two inputs are alternatives, not requirements: §9 takes from
+    // the other side when one is empty, and §14 case 12 is named "merger
+    // starvation" precisely because feeding one input is a supported case —
+    // throughput is one item per tick with no stall. Half a merger is an
+    // ordinary belt corner that cost 3 instead of 1, which is a waste of money
+    // and not a fault, so it is only worth mentioning when nothing feeds it at
+    // all. 92 pool levels offer a merger and the planner never uses one, so no
+    // solver-derived test would ever have put this board in front of the coach.
+    return b.type === 'merger' ? unfed.length === b.inPorts.length : true
+  })
   if (starved) {
     return {
       id: `starved-${starved.x}-${starved.y}`,

@@ -382,3 +382,72 @@ describe('against real pool levels', () => {
     expect(checked).toBeGreaterThan(0)
   }, 120_000)
 })
+
+/**
+ * The invariant, rather than another special case.
+ *
+ * Twice now a "problem" hint has fired on a board that was finished: once
+ * because one of two sources was idle, once because one of a merger's two
+ * inputs was — and §14 case 12 is *named* "merger starvation", so the second
+ * one contradicted an accepted spec case. Both were invisible to every test
+ * here, because both need a board no solver would ever produce.
+ *
+ * So this asserts the general rule instead of the two instances: if the
+ * simulator says the board wins, the coach has nothing to complain about. It is
+ * the cheapest possible statement of "do not tell someone who has just won that
+ * they are broken", and it does not need to know why they won.
+ */
+describe('a board that wins is never called broken', () => {
+  const DIRECTIONS = ['E', 'SE', 'SW', 'W', 'NW', 'NE'] as const
+
+  /**
+   * Swap a 120-degree belt corner for a merger of the same shape: legal, more
+   * expensive, still winning — and with only one of the merger's two inputs
+   * fed, which is exactly the board the planner will never build.
+   */
+  function withMerger(level: Level, placements: readonly Placement[]): Placement[] | null {
+    if (!level.available.includes('merger')) return null
+    for (let i = 0; i < placements.length; i += 1) {
+      const p = placements[i]
+      if (p.type !== 'conveyor' || p.in === undefined || p.out === undefined) continue
+      const k = DIRECTIONS.indexOf(p.out)
+      // A merger at rotation r takes in at out+2 and out+4.
+      if (p.in !== DIRECTIONS[(k + 4) % 6] && p.in !== DIRECTIONS[(k + 2) % 6]) continue
+      const swapped = placements.map((q, j) =>
+        j === i ? ({ type: 'merger', pos: p.pos, rotation: ((k * 60) % 360) as Placement['rotation'] } as Placement) : q,
+      )
+      if (simulate(level, { level_id: level.id, placements: swapped }).won) return swapped
+      return null
+    }
+    return null
+  }
+
+  it('holds across real pool solutions, and across ones with a merger in them', () => {
+    let boards = 0
+    let mergerBoards = 0
+
+    for (let i = 0; i < 24; i += 1) {
+      const level = pool[i]
+      const outcome = solve(level, i + 1, { ...DEFAULT_SEARCH_LIMITS, timeoutMs: 4000 })
+      if (outcome.cheapest === null) continue
+      const placements = outcome.cheapest.solution.placements
+      if (!simulate(level, { level_id: level.id, placements }).won) continue
+
+      const variants: Placement[][] = [[...placements]]
+      const merged = withMerger(level, placements)
+      if (merged) { variants.push(merged); mergerBoards += 1 }
+
+      for (const board of variants) {
+        expect(simulate(level, { level_id: level.id, placements: board }).won).toBe(true)
+        const hint = ask(level, board)
+        boards += 1
+        expect(hint?.tone, `${level.id} wins but the coach says: ${hint?.text}`).not.toBe('problem')
+      }
+    }
+
+    expect(boards).toBeGreaterThan(15)
+    // If this ever hits zero the merger half of the test has quietly stopped
+    // testing anything, which is how the bug got in.
+    expect(mergerBoards).toBeGreaterThan(0)
+  }, 180_000)
+})
