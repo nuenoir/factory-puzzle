@@ -78,3 +78,25 @@ export function ignoresCell(tool: PlaceableType | 'delete', isFixture: boolean):
 }
 
 export type { PlaceableType }
+
+/**
+ * The tool to keep hold of after the board changes to a different level.
+ *
+ * The palette selection is ordinary state and the levels do not offer the same
+ * buildings — every level in the rotation pool offers an assembler and a
+ * splitter, while the tutorial offers a belt and a press and nothing else. So
+ * "How to play", tapped while holding an assembler, carried that assembler onto
+ * a board that has never heard of one: the editor placed it quite happily, §2
+ * rejected the solution, and the board stopped rendering in favour of an error.
+ * The palette does not even show the tool as selected, because it lists what the
+ * *level* allows, so nothing on screen explained it.
+ *
+ * ERASE survives, since removing a building means the same thing on any level.
+ */
+export function toolFor(
+  tool: PlaceableType | 'delete',
+  available: readonly string[],
+): PlaceableType | 'delete' {
+  if (tool === 'delete' || available.includes(tool)) return tool
+  return 'conveyor'
+}

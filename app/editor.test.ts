@@ -8,8 +8,8 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { beltsFromPath, directionBetween, editReducer, ignoresCell, placementAt } from './editor'
-import type { Placement, PosTuple } from '@factory/sim'
+import { beltsFromPath, directionBetween, editReducer, ignoresCell, placementAt, toolFor } from './editor'
+import type { Level, Placement, PosTuple } from '@factory/sim'
 
 describe('directionBetween', () => {
   it('reads E and W the same on both row parities', () => {
@@ -229,5 +229,44 @@ describe('handing the board back', () => {
       placements: daily,
     })
     expect(restored).toEqual(daily)
+  })
+})
+
+describe('the tool in hand when the board changes', () => {
+  /**
+   * "How to play" swaps a daily level for the tutorial's, and the palette
+   * selection is state that survives the swap. Every pool level offers an
+   * assembler and a splitter; the tutorial offers a belt and a press. Carrying
+   * an assembler across put a building on the board that §2 rejects, and the
+   * palette could not even show it as selected — it lists what the level
+   * allows — so nothing on screen explained the error that replaced the board.
+   */
+  it('keeps a tool the new level allows', () => {
+    expect(toolFor('press', ['conveyor', 'press'])).toBe('press')
+    expect(toolFor('conveyor', ['conveyor', 'press'])).toBe('conveyor')
+  })
+
+  it('falls back to the belt when it does not', () => {
+    expect(toolFor('assembler', ['conveyor', 'press'])).toBe('conveyor')
+    expect(toolFor('splitter', ['conveyor', 'press'])).toBe('conveyor')
+    expect(toolFor('merger', ['conveyor', 'press'])).toBe('conveyor')
+  })
+
+  it('never takes erase away, since removing means the same on any level', () => {
+    expect(toolFor('delete', ['conveyor', 'press'])).toBe('delete')
+    expect(toolFor('delete', [])).toBe('delete')
+  })
+
+  it('lands on something every real level actually offers', async () => {
+    // The fallback is only safe because every level has a belt. Assert that
+    // over the whole pool and the tutorial rather than over one fixture.
+    const pool = (await import('../levels/daily.json')).default as unknown as Level[]
+    const tutorial = (await import('../levels/tutorial.json')).default as unknown as Level
+    for (const level of [...pool, tutorial]) {
+      for (const tool of ['conveyor', 'press', 'splitter', 'merger', 'assembler'] as const) {
+        const kept = toolFor(tool, level.available)
+        expect(level.available, `${level.id} cannot offer ${kept}`).toContain(kept)
+      }
+    }
   })
 })

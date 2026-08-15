@@ -31,7 +31,7 @@ import {
 
 import { Grid, type PointerPhase } from './components/Grid'
 import { Palette, type Tool } from './components/Palette'
-import { editReducer } from './editor'
+import { editReducer, toolFor } from './editor'
 import { today } from './daily'
 import { loadHistory, record, resultFor, saveHistory, stats } from './history'
 import { copyShare, shareText } from './share'
@@ -311,6 +311,7 @@ export default function App() {
     dispatch({ kind: 'clear' })
     if (stash.length > 0) dispatch({ kind: 'placeMany', placements: stash })
     setStash([])
+    setTool((t) => toolFor(t, daily.level.available))
     setMode('daily')
   }, [stash])
 
@@ -322,6 +323,7 @@ export default function App() {
   const replayTutorial = useCallback(() => {
     setStash(placements)
     dispatch({ kind: 'clear' })
+    setTool((t) => toolFor(t, TUTORIAL_LEVEL.available))
     setMode('tutorial')
   }, [placements])
 
