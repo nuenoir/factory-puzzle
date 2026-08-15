@@ -205,6 +205,40 @@ $mutations = @(
     from = '      const identity = planIdentity(plan)'
     to   = '      const identity = canonicalPlan(plan)'
     kills = 'keeping mirror plans in the search even though they are one idea'
+  },
+  # The coach and the tutorial both answer "is this wired up?", and both would
+  # look fine while quietly reading adjacency instead of the section-4 facing
+  # rule. That is the exact bug they exist to explain, so it is the exact
+  # mutation worth proving they catch.
+  @{
+    file = 'app/coach.ts'
+    from = "    if (n.x === to.x && n.y === to.y) return to.inPorts.includes(opposite(d))`n  }`n  return false`n}`n`n/** Anything adjacent"
+    to   = "    if (n.x === to.x && n.y === to.y) return true`n  }`n  return false`n}`n`n/** Anything adjacent"
+    kills = 'the coach checking that the far building faces back'
+  },
+  @{
+    file = 'app/coach.ts'
+    from = '  if (!makeableNow(level, built).has(target)) {'
+    to   = '  if (false) {'
+    kills = 'noticing a tidily wired board that cannot make the target at all'
+  },
+  @{
+    file = 'app/tutorial.ts'
+    from = '    if (n.x === to.x && n.y === to.y) return to.inPorts.includes(opposite(d))'
+    to   = '    if (n.x === to.x && n.y === to.y) return true'
+    kills = 'the tutorial accepting a belt that is merely beside the sink'
+  },
+  @{
+    file = 'app/tutorial.ts'
+    from = '  return steps.find((step) => !step.done(board)) ?? null'
+    to   = '  return steps.find((step) => step.done(board)) ?? null'
+    kills = 'showing the earliest step still outstanding'
+  },
+  @{
+    file = 'app/tutorial.ts'
+    from = "    done: ({ status }) => status === 'won',"
+    to   = "    done: () => true,"
+    kills = 'ending the tutorial on a win rather than on a full-looking board'
   }
 )
 
