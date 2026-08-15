@@ -16,11 +16,14 @@ import {
   stateKey,
   step,
   validateLevel,
+  type PosTuple,
   type Level,
   type Placement,
   type Snapshot,
 } from '@factory/sim'
 
+import { editReducer, type PlaceableType } from './editor'
+import { onCell, type Drag } from './gesture'
 import { statusAfterStep, type StepOutcome } from './run'
 import {
   STORAGE_KEY,
@@ -141,13 +144,124 @@ describe('walking the steps', () => {
   })
 })
 
+/**
+ * Following the script with a finger, not with the answer.
+ *
+ * The test below this one walks `Placement` objects, which is solver output —
+ * it silently assumes the right tool was in hand for each one. The palette is
+ * ordinary state that nothing resets between steps, so that assumption was
+ * false: only step 2 ever named a tool, and a player who did what it said was
+ * still holding PRESS three steps later. Dragging to the sink then laid a
+ * press, `reach-the-sink` was satisfied anyway (a press at r0 outputs E, the
+ * sink accepts from W), and the banner said "That is a factory" over a board
+ * that delivered nothing in 300 ticks.
+ *
+ * So these replay through the real `onCell` and `editReducer`, carrying a tool
+ * the way App.tsx does. CLAUDE.md charters this file to check the script
+ * "doing exactly and only what each step says" — that has to include which
+ * button the step tells you to press.
+ */
+describe('following the script with the palette in hand', () => {
+  const fixtures = new Set([...level.sources, ...level.sinks].map((f) => `${f.pos[0]},${f.pos[1]}`))
+  const isFixture = (p: PosTuple) => fixtures.has(`${p[0]},${p[1]}`)
+
+  /** One gesture, exactly as the board delivers it. */
+  function swipe(
+    placements: readonly Placement[],
+    tool: PlaceableType | 'delete',
+    cells: readonly PosTuple[],
+  ): Placement[] {
+    let state = [...placements]
+    let drag: Drag | null = null
+    cells.forEach((pos, i) => {
+      const out = onCell(i === 0 ? 'down' : 'move', pos, { tool, rotation: 0, placements: state, drag, isFixture })
+      drag = out.drag
+      for (const a of out.actions) state = editReducer(state, a)
+    })
+    const up = onCell('up', cells[cells.length - 1], {
+      tool, rotation: 0, placements: state, drag, isFixture,
+    })
+    for (const a of up.actions) state = editReducer(state, a)
+    return state
+  }
+
+  it('names its tool in the text of every step that places something', () => {
+    // The prose and the `tool` field have to agree, because the prose is the
+    // only thing the player ever sees.
+    for (const step of TUTORIAL_STEPS) {
+      if (step.tool === undefined) continue
+      const named = step.tool === 'conveyor' ? 'BELT' : step.tool.toUpperCase()
+      expect(step.text, `${step.id} never says which tool to pick`).toContain(named)
+    }
+  })
+
+  it('wins when each step is done with the tool that step names', () => {
+    const gestures: Record<string, readonly PosTuple[]> = {
+      'lay-a-belt': [[0, 1], [1, 1]],
+      'place-a-press': [[2, 1]],
+      'feed-the-press': [[1, 1], [2, 1]],
+      'reach-the-sink': [[2, 1], [3, 1], [4, 1]],
+    }
+
+    let placed: Placement[] = []
+    const visited: string[] = []
+    for (let guard = 0; guard < TUTORIAL_STEPS.length; guard += 1) {
+      const step = currentStep(board(placed))
+      if (step === null || step.id === 'run-it') break
+      visited.push(step.id)
+      expect(step.tool, `${step.id} has no tool to pick up`).toBeDefined()
+      placed = swipe(placed, step.tool!, gestures[step.id])
+    }
+
+    expect(visited).toEqual(['lay-a-belt', 'place-a-press', 'reach-the-sink'])
+    expect(currentStep(board(placed))?.id).toBe('run-it')
+
+    const result = simulate(level, { level_id: level.id, placements: placed })
+    expect(result.won).toBe(true)
+    expect(result.cost).toBe(level.par)
+  })
+
+  it('does not call a board of presses a factory', () => {
+    // The exact failure the tool naming exists to prevent: step 2's PRESS still
+    // in hand when step 4 asks for a belt. Kept as a test so that if the script
+    // ever stops naming its tools, this is what it will cost.
+    let p = swipe([], 'conveyor', [[0, 1], [1, 1]])
+    p = swipe(p, 'press', [[2, 1]])
+    const withPress = swipe(p, 'press', [[3, 1], [4, 1]])
+
+    expect(withPress.filter((x) => x.type === 'press')).toHaveLength(2)
+    expect(currentStep(board(withPress))?.id).toBe('run-it') // it *looks* finished
+    expect(simulate(level, { level_id: level.id, placements: withPress }).won).toBe(false)
+
+    // And with the belt the step now names, the same gesture wins at par.
+    const withBelt = swipe(p, 'conveyor', [[3, 1], [4, 1]])
+    const run = simulate(level, { level_id: level.id, placements: withBelt })
+    expect(run.won).toBe(true)
+    expect(run.cost).toBe(level.par)
+  })
+
+  it('leaves a way out of a cell the player has filled by mistake', () => {
+    // Laying anything on (1,1) blocks step 1 permanently: it is the only cell
+    // the source's single E output can reach, and a belt route may not begin by
+    // moving onto a building. ERASE is the only escape, so step 1 has to say so.
+    let p = swipe([], 'press', [[1, 1]])
+    const stuck = swipe(p, 'conveyor', [[0, 1], [1, 1]])
+    expect(stuck).toEqual(p) // step 1's own instruction does nothing
+    expect(currentStep(board(stuck))?.id).toBe('lay-a-belt')
+    expect(TUTORIAL_STEPS[0].text).toMatch(/erase/i)
+
+    p = swipe(stuck, 'delete', [[1, 1]])
+    const freed = swipe(p, 'conveyor', [[0, 1], [1, 1]])
+    expect(currentStep(board(freed))?.id).toBe('place-a-press')
+  })
+})
+
 describe('the script actually works', () => {
   it('reaches a real win by following the steps in order', () => {
     /**
-     * The test this file exists for. Do only what each step asks, in the order
-     * it asks, and check the factory the instructions describe genuinely runs —
-     * rather than trusting that the author, who already knows the answer, wrote
-     * instructions that lead to it.
+     * Do only what each step asks, in the order it asks, and check the factory
+     * the instructions describe genuinely runs — rather than trusting that the
+     * author, who already knows the answer, wrote instructions that lead to it.
      */
     const placed: Placement[] = []
     const additions: Placement[] = [BELT_IN, PRESS, BELT_OUT]

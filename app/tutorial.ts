@@ -20,6 +20,7 @@
 
 import { neighbourOf, opposite, type BuildingSnapshot, type Snapshot } from '@factory/sim'
 
+import type { PlaceableType } from './editor'
 import type { StepOutcome } from './run'
 
 export const STORAGE_KEY = 'factory-puzzle:tutorial:v1'
@@ -30,6 +31,17 @@ export interface TutorialStep {
   readonly text: string
   /** True once the board shows this has been done. */
   readonly done: (board: Board) => boolean
+  /**
+   * The palette tool this step's action needs.
+   *
+   * The palette is ordinary state: nothing resets it between steps, so whatever
+   * the last step asked for is still in hand. A step that asks for a belt while
+   * the player is holding the press from two steps ago gets a press — and the
+   * script had no way to say otherwise, because only one step ever named a
+   * tool. Every step that places something now names its tool in the text, and
+   * this field is what the test checks the prose against.
+   */
+  readonly tool?: PlaceableType
 }
 
 /** Everything a step is allowed to look at. */
@@ -65,7 +77,8 @@ const sinkOf = (s: Snapshot) => s.buildings.find((b) => b.type === 'sink')
 export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   {
     id: 'lay-a-belt',
-    text: 'Belts are drawn, not tapped. Press on the source and drag to the right to lay one.',
+    tool: 'conveyor',
+    text: 'Belts are drawn, not tapped. Choose BELT, then press on the source and drag to the right. ERASE clears a cell if you want one back.',
     done: ({ snapshot }) => {
       if (snapshot === null) return false
       const source = sourceOf(snapshot)
@@ -75,12 +88,14 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   },
   {
     id: 'place-a-press',
+    tool: 'press',
     text: 'The sink wants plate, and the source only makes ore. Choose PRESS and tap the cell after your belt — a press turns ore into plate.',
     done: ({ snapshot }) => snapshot !== null && snapshot.buildings.some((b) => b.type === 'press'),
   },
   {
     id: 'feed-the-press',
-    text: 'The press needs the ore. Make sure your belt runs into it — drag onto the press itself and the belt turns to face it.',
+    tool: 'conveyor',
+    text: 'The press needs the ore. Choose BELT again and drag onto the press itself — the belt turns to face it.',
     done: ({ snapshot }) => {
       if (snapshot === null) return false
       const press = snapshot.buildings.find((b) => b.type === 'press')
@@ -90,7 +105,8 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   },
   {
     id: 'reach-the-sink',
-    text: 'Now run a belt from the press into the sink. Two buildings only connect when each faces the other, so drag onto the sink itself.',
+    tool: 'conveyor',
+    text: 'Choose BELT and run one from the press into the sink. Two buildings only connect when each faces the other, so drag onto the sink itself.',
     done: ({ snapshot }) => {
       if (snapshot === null) return false
       const sink = sinkOf(snapshot)
