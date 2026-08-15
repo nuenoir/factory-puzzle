@@ -23,6 +23,7 @@ import {
   step,
   type PosTuple,
   type Rotation,
+  type Level,
   type Snapshot,
   type World,
 } from '@factory/sim'
@@ -36,6 +37,9 @@ import { copyShare, shareText } from './share'
 import { statusAfterStep, type StepOutcome } from './run'
 import { nextHint } from './coach'
 import { onCell, type Drag } from './gesture'
+import { TUTORIAL_STEPS, currentStep, markTutorialDone, stepNumber, tutorialDone } from './tutorial'
+import tutorialJson from '../levels/tutorial.json'
+import { colors } from './theme'
 
 /**
  * The one clock read in the app.
@@ -45,8 +49,10 @@ import { onCell, type Drag } from './gesture'
  * under a half-built factory at midnight would be a worse bug than a session
  * left open overnight showing yesterday's puzzle until it is reloaded.
  */
-const { day, level } = today()
-import { colors } from './theme'
+const daily = today()
+
+/** The teaching board. Its own small level, so a first attempt cannot spoil a daily. */
+const TUTORIAL_LEVEL = tutorialJson as unknown as Level
 
 /** `idle` is a UI state — nothing has been stepped yet. The rest come from §10. */
 type Status = 'idle' | StepOutcome
@@ -71,9 +77,8 @@ function scoreLabel(toPar: number): string {
 }
 
 /** Sources and sinks are fixed by the level and not placeable (§4). */
-const fixtureCells = new Set(
-  [...level.sources, ...level.sinks].map((f) => `${f.pos[0]},${f.pos[1]}`),
-)
+const fixturesOf = (lv: Level) =>
+  new Set([...lv.sources, ...lv.sinks].map((f) => `${f.pos[0]},${f.pos[1]}`))
 
 export default function App() {
   const [placements, dispatch] = useReducer(editReducer, [])
@@ -107,7 +112,27 @@ export default function App() {
   const [copied, setCopied] = useState<'idle' | 'ok' | 'failed'>('idle')
   const [hintsHidden, setHintsHidden] = useState(false)
 
-  const solution = useMemo(() => ({ level_id: level.id, placements }), [placements])
+  /**
+   * Which board is on screen. A first visit opens on the tutorial, because the
+   * game has no other way of explaining that belts are dragged and that two
+   * buildings only connect when each faces the other.
+   */
+  const [mode, setMode] = useState<'tutorial' | 'daily'>(() => (tutorialDone() ? 'daily' : 'tutorial'))
+  const level = mode === 'tutorial' ? TUTORIAL_LEVEL : daily.level
+  const day = daily.day
+  const fixtureCells = useMemo(() => fixturesOf(level), [level])
+
+  // `advance` and `bank` are memoised on an empty dependency list, so they read
+  // the current level and mode through refs. Capturing them would leave a mode
+  // switch scoring against the board the player had just left.
+  const levelRef = useRef(level)
+  levelRef.current = level
+  const modeRef = useRef(mode)
+  modeRef.current = mode
+
+  // Keyed on the level too: switching board changes `level_id`, and a solution
+  // still carrying the old one is rejected outright by §12 validation.
+  const solution = useMemo(() => ({ level_id: level.id, placements }), [level.id, placements])
   const cost = useMemo(() => costOf(solution), [solution])
   const costRef = useRef(cost)
   costRef.current = cost
@@ -121,9 +146,9 @@ export default function App() {
   const bank = useCallback((ticks: number) => {
     setHistory((previousHistory) => {
       const next = record(previousHistory, {
-        day,
-        levelId: level.id,
-        par: level.par,
+        day: daily.day,
+        levelId: daily.level.id,
+        par: daily.level.par,
         cost: costRef.current,
         ticks,
         // Collected tick by tick as the run happened, so the trace on the share
@@ -154,7 +179,7 @@ export default function App() {
     setSnap(snapshot(built.world))
     setPrevious(null)
     setProgress(1)
-  }, [solution])
+  }, [level, solution])
 
   useEffect(rebuild, [rebuild])
 
@@ -162,12 +187,13 @@ export default function App() {
     const world = worldRef.current
     if (!world) return
 
+    const active = levelRef.current
     const before = stateKey(world)
-    const deliveredBefore = world.delivered.get(level.target.type) ?? 0
+    const deliveredBefore = world.delivered.get(active.target.type) ?? 0
     const wasShowing = snapshot(world)
     step(world)
     // One entry per item, since a tick can deliver more than one.
-    const deliveredNow = world.delivered.get(level.target.type) ?? 0
+    const deliveredNow = world.delivered.get(active.target.type) ?? 0
     for (let i = deliveredBefore; i < deliveredNow; i += 1) deliveredAt.current.push(world.tickCount)
     setPrevious(wasShowing)
     setSnap(snapshot(world))
@@ -181,15 +207,19 @@ export default function App() {
     setEpoch((e) => e + 1)
 
     const outcome = statusAfterStep({
-      delivered: world.delivered.get(level.target.type) ?? 0,
-      target: level.target.count,
+      delivered: world.delivered.get(active.target.type) ?? 0,
+      target: active.target.count,
       tickCount: world.tickCount,
-      maxTicks: level.max_ticks,
+      maxTicks: active.max_ticks,
       stalled: stateKey(world) === before,
     })
     setStatus(outcome)
     if (outcome !== 'running') setPlaying(false)
-    if (outcome === 'won') bank(world.tickCount)
+    if (outcome === 'won') {
+      // A tutorial win teaches; it does not count towards a streak or a share.
+      if (modeRef.current === 'daily') bank(world.tickCount)
+      else markTutorialDone()
+    }
   }, [])
 
   useEffect(() => {
@@ -253,18 +283,48 @@ export default function App() {
   // snapshot the board is drawn from. `hidden` lets a player who finds it
   // patronising put it away for the session.
   const hint = useMemo(
-    () => (hintsHidden ? null : nextHint({ level, snapshot: snap, status, cost, hasErrors: errors.length > 0 })),
-    [hintsHidden, snap, status, cost, errors.length],
+    () =>
+      hintsHidden || mode === 'tutorial'
+        ? null
+        : nextHint({ level, snapshot: snap, status, cost, hasErrors: errors.length > 0 }),
+    [hintsHidden, mode, level, snap, status, cost, errors.length],
   )
+
+  const board = useMemo(() => ({ snapshot: snap, status }), [snap, status])
+  const tutorialStep = mode === 'tutorial' ? currentStep(board) : null
+
+  /** Leave the tutorial for today's puzzle, and do not offer it again. */
+  const leaveTutorial = useCallback(() => {
+    markTutorialDone()
+    dispatch({ kind: 'clear' })
+    setMode('daily')
+  }, [])
+
+  /**
+   * Back to the tutorial. Reachable at any time, because the rule it teaches is
+   * the one people forget, and there is nothing to lose by re-reading it —
+   * today's progress is banked on the win, not on the board being left alone.
+   */
+  const replayTutorial = useCallback(() => {
+    dispatch({ kind: 'clear' })
+    setMode('tutorial')
+  }, [])
 
   return (
     <ScrollView contentContainerStyle={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.title}>Factory Puzzle</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Factory Puzzle</Text>
+          {mode === 'daily' ? (
+            <Pressable testID="btn-how-to-play" onPress={replayTutorial} hitSlop={8}>
+              <Text style={styles.howTo}>How to play</Text>
+            </Pressable>
+          ) : null}
+        </View>
         <Text style={styles.subtitle}>
-          Day {day} — deliver {level.target.count} {level.target.type}
+          {mode === 'tutorial' ? 'How to play' : `Day ${day}`} — deliver {level.target.count} {level.target.type}
         </Text>
-        {summary.currentStreak > 0 || banked !== undefined ? (
+        {mode === 'daily' && (summary.currentStreak > 0 || banked !== undefined) ? (
           <Text style={styles.streak}>
             {summary.currentStreak > 0
               ? `${summary.currentStreak} day streak`
@@ -342,6 +402,24 @@ export default function App() {
           </Pressable>
         ))}
       </View>
+
+      {/* In the tutorial the script leads and the coach stays quiet, so the
+          player is following one voice rather than two. */}
+      {mode === 'tutorial' ? (
+        <View style={[styles.hintBox, styles.tutorialBox]} testID="tutorial-step">
+          <View style={styles.tutorialBody}>
+            <Text style={styles.tutorialCount}>
+              {tutorialStep === null ? 'Done' : `Step ${stepNumber(board)} of ${TUTORIAL_STEPS.length}`}
+            </Text>
+            <Text style={styles.hintText}>
+              {tutorialStep?.text ?? 'That is the whole game. Today’s puzzle is bigger, but it is the same three ideas.'}
+            </Text>
+          </View>
+          <Pressable testID="btn-leave-tutorial" onPress={leaveTutorial} hitSlop={8}>
+            <Text style={styles.tutorialSkip}>{tutorialStep === null ? "Today’s puzzle" : 'Skip'}</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {hint ? (
         <View style={[styles.hintBox, hint.tone === 'problem' && styles.hintProblem, hint.tone === 'win' && styles.hintWin]} testID="hint">
@@ -463,6 +541,18 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: colors.muted,
   },
+  titleRow: { flexDirection: 'row', alignItems: 'baseline', gap: 12 },
+  howTo: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  tutorialBox: { borderLeftColor: colors.good, alignItems: 'center' },
+  tutorialBody: { flexShrink: 1, gap: 3 },
+  tutorialCount: {
+    color: colors.good,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  tutorialSkip: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   hintProblem: { borderLeftColor: colors.warn },
   hintWin: { borderLeftColor: colors.good },
   hintText: { color: colors.text, fontSize: 13, lineHeight: 19, flexShrink: 1 },
