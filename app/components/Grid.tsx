@@ -58,6 +58,8 @@ interface GridProps {
   readonly duration?: number
   /** The cell under the pointer, lifted so the board can answer the touch. */
   readonly active?: readonly [number, number] | null
+  /** A cell the coach is pointing at; ringed so the hint has somewhere to land. */
+  readonly hintAt?: readonly [number, number] | null
 }
 
 export function Grid({
@@ -69,6 +71,7 @@ export function Grid({
   progress = 1,
   duration = 2,
   active = null,
+  hintAt = null,
 }: GridProps) {
   const { width: windowWidth } = useWindowDimensions()
   const w = cellSizeFor(Math.min(windowWidth - 24, 520), width)
@@ -144,6 +147,7 @@ export function Grid({
           building={byCell.get(`${x},${y}`)}
           duration={duration}
           active={active !== null && active[0] === x && active[1] === y}
+          hinted={hintAt !== null && hintAt[0] === x && hintAt[1] === y}
           flow={blocked.has(`${x},${y}`) ? null : snapshot.tick + progress}
         />,
       )
@@ -257,11 +261,12 @@ interface CellProps {
   readonly building: BuildingSnapshot | undefined
   readonly duration: number
   readonly active: boolean
+  readonly hinted: boolean
   /** Continuously rising phase for the belt chevrons, or null when blocked. */
   readonly flow: number | null
 }
 
-function Cell({ x, y, w, building, duration, active, flow }: CellProps) {
+function Cell({ x, y, w, building, duration, active, hinted, flow }: CellProps) {
   const h = hexHeight(w)
   const { left, top } = cellOrigin(x, y, w)
   const style = building ? buildingStyles[building.type] : null
@@ -291,7 +296,7 @@ function Cell({ x, y, w, building, duration, active, flow }: CellProps) {
       ]}
     >
       {/* Outline hexagon behind a slightly smaller fill hexagon. */}
-      <Hexagon w={w} h={h} fill={active ? colors.text : edge + (building ? '77' : '')} lit={false} />
+      <Hexagon w={w} h={h} fill={hinted ? colors.warn : active ? colors.text : edge + (building ? '77' : '')} lit={false} />
       <View style={[styles.inset, { left: 1.5, top: 1.5 }]}>
         <Hexagon w={w - 3} h={h - 3} fill={fill} />
       </View>

@@ -34,6 +34,7 @@ import { today } from './daily'
 import { loadHistory, record, resultFor, saveHistory, stats } from './history'
 import { copyShare, shareText } from './share'
 import { statusAfterStep, type StepOutcome } from './run'
+import { nextHint } from './coach'
 import { onCell, type Drag } from './gesture'
 
 /**
@@ -104,6 +105,7 @@ export default function App() {
   // return what we last put there.
   const [history, setHistory] = useState(loadHistory)
   const [copied, setCopied] = useState<'idle' | 'ok' | 'failed'>('idle')
+  const [hintsHidden, setHintsHidden] = useState(false)
 
   const solution = useMemo(() => ({ level_id: level.id, placements }), [placements])
   const cost = useMemo(() => costOf(solution), [solution])
@@ -247,6 +249,14 @@ export default function App() {
   const summary = useMemo(() => stats(history, day), [history])
   const banked = resultFor(history, day)
 
+  // One sentence about why the factory is not working, derived from the same
+  // snapshot the board is drawn from. `hidden` lets a player who finds it
+  // patronising put it away for the session.
+  const hint = useMemo(
+    () => (hintsHidden ? null : nextHint({ level, snapshot: snap, status, cost, hasErrors: errors.length > 0 })),
+    [hintsHidden, snap, status, cost, errors.length],
+  )
+
   return (
     <ScrollView contentContainerStyle={styles.screen}>
       <View style={styles.header}>
@@ -276,6 +286,7 @@ export default function App() {
           height={level.grid.height}
           onCell={handleCell}
           active={activeCell}
+          hintAt={hint?.at ?? null}
         />
       ) : (
         <View style={styles.errorBox}>
@@ -331,6 +342,20 @@ export default function App() {
           </Pressable>
         ))}
       </View>
+
+      {hint ? (
+        <View style={[styles.hintBox, hint.tone === 'problem' && styles.hintProblem, hint.tone === 'win' && styles.hintWin]} testID="hint">
+          <Text style={styles.hintText}>{hint.text}</Text>
+          <Pressable
+            testID="btn-hide-hints"
+            onPress={() => setHintsHidden(true)}
+            hitSlop={8}
+            accessibilityLabel="Hide hints"
+          >
+            <Text style={styles.hintDismiss}>✕</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <Text style={[styles.status, statusTone(status)]}>{statusText(status, snap?.tick ?? 0, placements.length)}</Text>
 
@@ -421,6 +446,27 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 24, fontWeight: '700' },
   subtitle: { color: colors.muted, fontSize: 13, marginTop: 2 },
   streak: { color: colors.good, fontSize: 12, fontWeight: '700', marginTop: 6, letterSpacing: 0.3 },
+  hintBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginTop: 14,
+    maxWidth: 460,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.panelEdge,
+    // A left rule carries the tone, so the box itself stays quiet enough to sit
+    // under the board without competing with it.
+    borderLeftWidth: 3,
+    borderLeftColor: colors.muted,
+  },
+  hintProblem: { borderLeftColor: colors.warn },
+  hintWin: { borderLeftColor: colors.good },
+  hintText: { color: colors.text, fontSize: 13, lineHeight: 19, flexShrink: 1 },
+  hintDismiss: { color: colors.faint, fontSize: 13, fontWeight: '700' },
   shareBox: {
     marginTop: 18,
     alignItems: 'center',
