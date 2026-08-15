@@ -100,6 +100,15 @@ That test is why two things came out of `App.tsx`: `gesture.ts` (what a touch do
 
 **Which puzzle a date maps to is a pure function and must stay one.** No clock reads inside it, no `Date.now()` buried in a helper — the date comes in as an argument so the mapping can be tested at any point in the rotation, including the day the pool wraps. Same rule as the simulator, same reason.
 
+## Onboarding
+
+Two pieces, both outside the component for the reason above, and both deriving everything from the simulator's own `snapshot` — including each building's resolved `inPorts`/`outPorts`. **Never re-implement the §4 connection rule from level data**: a coach that disagreed with the engine is worse than no coach.
+
+- `app/coach.ts` — one sentence on why the factory isn't working, chosen from a priority ladder. One hint at a time; a list of six problems is a wall, not help. `makeableNow` is gated on the machines **actually placed**, because connectivity is not correctness — a press wired neatly from source to sink is a complete, running, beautifully connected factory that delivers the wrong item forever.
+- `app/tutorial.ts` + `levels/tutorial.json` — a real level with a script over it. Each step is a sentence and a predicate on the board; the current step is the first whose predicate is still false, so someone who ignores the text and solves it outright satisfies every step at once. That is correct, not a bug. Its own 5×3 board with two tools, so a first attempt cannot spoil the daily.
+
+The test that earns the tutorial its place is `the script actually works`: follow the steps in order, doing exactly and only what each says, and assert the described factory genuinely runs. Instructions that do not lead to the answer stay broken precisely because the author already knows it.
+
 ## Commands
 
 ```
