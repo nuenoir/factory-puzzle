@@ -244,13 +244,30 @@ export function nextHint(input: CoachInput): Hint | null {
     }
   }
 
-  const unusedSource = sources.find((s) => drains(snapshot, s).length === 0)
-  if (unusedSource) {
+  // Only when *nothing at all* is being drawn — not merely when one source is
+  // idle. A level may offer two sources while the cheapest factory splits one
+  // of them and never touches the other, and that board is finished, not
+  // broken. Asking "is any source idle?" called 74 of the 203 solvable pool
+  // levels broken at the moment they were won, every one of them two-source
+  // and none of them one-source, which is exactly why hand-built worlds never
+  // showed it.
+  //
+  // The masking was the worse half. This branch sits above the sink checks, so
+  // on 50 of those levels a belt turned away from the sink — the four-in-five
+  // bug itself — was reported as an idle source, and the one lesson the game
+  // hinges on never got shown.
+  //
+  // A player who has wired one arm of a two-source level and stalled is not
+  // left without help: the assembler waiting on its second input trips the
+  // starved branch below, which points at the machine rather than the source.
+  const idleSources = sources.filter((s) => drains(snapshot, s).length === 0)
+  if (idleSources.length > 0 && idleSources.length === sources.length) {
+    const idle = idleSources[0]
     return {
-      id: `source-idle-${unusedSource.x}-${unusedSource.y}`,
+      id: `source-idle-${idle.x}-${idle.y}`,
       tone: 'problem',
-      at: posOf(unusedSource),
-      text: `Nothing is carrying ${unusedSource.emits ?? 'anything'} away from the source yet. Start a drag on it.`,
+      at: posOf(idle),
+      text: `Nothing is carrying ${idle.emits ?? 'anything'} away from the source yet. Start a drag on it.`,
     }
   }
 

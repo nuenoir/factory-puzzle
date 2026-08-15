@@ -9,9 +9,21 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { createWorld, simulate, snapshot, stateKey, step, type Level, type Placement, type Snapshot } from '@factory/sim'
+import { DEFAULT_SEARCH_LIMITS, solve } from '@factory/gen'
+import {
+  createWorld,
+  neighbourOf,
+  simulate,
+  snapshot,
+  stateKey,
+  step,
+  type Level,
+  type Placement,
+  type Snapshot,
+} from '@factory/sim'
 
 import { nextHint, type CoachInput } from './coach'
+import { pool } from './daily'
 import { statusAfterStep } from './run'
 
 function makeLevel(overrides: Partial<Level> = {}): Level {
@@ -180,6 +192,34 @@ describe('machines', () => {
     expect(hint?.id).toMatch(/^source-idle/)
     expect(hint?.at).toEqual([0, 3])
   })
+
+  it('says nothing about a second source the factory does not need', () => {
+    // Two sources, one of them feeding a belt, the other untouched. Half a
+    // level's worth of ore going unused is not a fault — the cheapest factory
+    // on most two-source pool levels splits one source and never touches the
+    // other. Asking "is *any* source idle?" called those boards broken.
+    const level = makeLevel({
+      sources: [
+        { pos: [0, 3], rotation: 0, emits: 'circle' },
+        { pos: [0, 5], rotation: 0, emits: 'circle' },
+      ],
+      target: { type: 'disc', count: 5 },
+    })
+    const hint = ask(level, [{ type: 'conveyor', pos: [1, 3], in: 'W', out: 'E' }])
+    expect(hint?.id).not.toMatch(/^source-idle/)
+  })
+
+  it('still speaks up when no source at all is being drawn from', () => {
+    const level = makeLevel({
+      sources: [
+        { pos: [0, 3], rotation: 0, emits: 'circle' },
+        { pos: [0, 5], rotation: 0, emits: 'circle' },
+      ],
+      target: { type: 'disc', count: 5 },
+    })
+    const hint = ask(level, [{ type: 'press', pos: [3, 1], rotation: 0 }])
+    expect(hint?.id).toMatch(/^source-idle/)
+  })
 })
 
 describe('after a run', () => {
@@ -268,4 +308,77 @@ describe('hint identity', () => {
     ])
     expect(a?.id).not.toBe(b?.id)
   })
+})
+
+/**
+ * The pool, not a fixture.
+ *
+ * CLAUDE.md: "the fixture that makes tests convenient is also the fixture that
+ * makes them agree with each other." Every test above builds its own world, and
+ * every one of those worlds has a single source — so all of them agreed that
+ * asking "is any source idle?" was the same question as "is the factory being
+ * fed?". On the 96 two-source levels in the rotation pool it is not.
+ *
+ * Measured over the 203 pool levels the solver can solve: the old check called
+ * 74 winning boards broken, all two-source, none one-source. On 50 of them it
+ * also sat on top of the sink lesson, so a belt turned away from the sink — the
+ * four-in-five bug itself — was reported as an idle source.
+ */
+describe('against real pool levels', () => {
+  /** Two-source levels only: the one-source case was never in doubt. */
+  const twoSource = pool.map((level, i) => ({ level, day: i + 1 })).filter((p) => p.level.sources.length === 2).slice(0, 12)
+
+  /** Turn the belt that enters the sink so it points somewhere else. */
+  function breakSinkFeed(level: Level, placements: readonly Placement[]): Placement[] {
+    const sink = level.sinks[0].pos
+    const dirs = ['E', 'SE', 'SW', 'W', 'NW', 'NE'] as const
+    return placements.map((p) => {
+      if (p.type !== 'conveyor' || p.out === undefined || p.in === undefined) return p
+      const n = neighbourOf(p.pos[0], p.pos[1], p.out)
+      if (n.x !== sink[0] || n.y !== sink[1]) return p
+      for (const d of dirs) {
+        if (d === p.in) continue
+        const m = neighbourOf(p.pos[0], p.pos[1], d)
+        if (m.x === sink[0] && m.y === sink[1]) continue
+        if (m.x < 0 || m.y < 0 || m.x >= level.grid.width || m.y >= level.grid.height) continue
+        return { ...p, out: d }
+      }
+      return p
+    })
+  }
+
+  it('has two-source levels to test on at all', () => {
+    expect(twoSource.length).toBe(12)
+  })
+
+  it('calls a winning factory finished, on every one of them', () => {
+    for (const { level, day } of twoSource) {
+      const outcome = solve(level, day, { ...DEFAULT_SEARCH_LIMITS, timeoutMs: 4000 })
+      if (outcome.cheapest === null) continue
+      const placements = outcome.cheapest.solution.placements
+      expect(simulate(level, { level_id: level.id, placements }).won).toBe(true)
+
+      const hint = ask(level, [...placements])
+      // The board wins. There is nothing to fix, and saying otherwise sends a
+      // player who has just finished back to the start of their own line.
+      expect(hint?.tone, `${level.id}: ${hint?.text}`).not.toBe('problem')
+      expect(hint?.id, `${level.id}: ${hint?.text}`).toBe('ready')
+    }
+  }, 120_000)
+
+  it('teaches the sink lesson when the sink is the problem, even with a source spare', () => {
+    let checked = 0
+    for (const { level, day } of twoSource) {
+      const outcome = solve(level, day, { ...DEFAULT_SEARCH_LIMITS, timeoutMs: 4000 })
+      if (outcome.cheapest === null) continue
+      const broken = breakSinkFeed(level, outcome.cheapest.solution.placements)
+      // Only assert on levels the break actually broke.
+      if (simulate(level, { level_id: level.id, placements: broken }).won) continue
+      checked += 1
+
+      const hint = ask(level, broken)
+      expect(hint?.id, `${level.id}: ${hint?.text}`).toMatch(/^sink-not-facing|^sink-unfed/)
+    }
+    expect(checked).toBeGreaterThan(0)
+  }, 120_000)
 })

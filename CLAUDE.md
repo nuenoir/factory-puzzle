@@ -122,6 +122,7 @@ npm run web
 
 Kept as a running list. Add to it.
 
+- **A hint can be right on the fixture and confidently wrong on a third of the pool.** The coach asked "is *any* source idle?", which is the same question as "is the factory being fed?" only when there is one source. There are 96 two-source levels in the pool, and the cheapest factory on most of them splits one source and never touches the other — so **74 of the 203 solvable levels were told they were broken at the moment they were won**. The masking was worse: that branch sits above the sink checks, so on 50 of them a belt turned away from the sink — the four-in-five bug itself — was reported as an idle source and the lesson the game hinges on never appeared. Every hand-built world in `coach.test.ts` had one source, so all of them agreed with each other. **Anything that gives the player advice needs the same real-pool testing as anything that takes their input**; `coach.test.ts` now solves real pool levels, and `scratchpad/mutate.ps1` carries the mutation that restores the bug.
 - Conveyors are `{in, out}` pairs, **not** rotations. Rotation-only belts can't turn corners, which makes every puzzle a straight line.
 - `cost` is the **sum of building costs** from §4, not a count of buildings.
 - Splitter and merger round-robin flags are simulation state. They must reset on run-reset and serialise with saved state. This is the most common source of non-determinism in this genre.

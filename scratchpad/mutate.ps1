@@ -222,6 +222,16 @@ $mutations = @(
     to   = '  if (false) {'
     kills = 'noticing a tidily wired board that cannot make the target at all'
   },
+  # The four-in-five shape, second time around. Asking "is ANY source idle?"
+  # instead of "is nothing being drawn at all?" called 74 winning pool boards
+  # broken and masked the sink lesson on 50 of them, and every hand-built world
+  # in coach.test.ts agreed it was fine because every one of them has one source.
+  @{
+    file = 'app/coach.ts'
+    from = '  if (idleSources.length > 0 && idleSources.length === sources.length) {'
+    to   = '  if (idleSources.length > 0) {'
+    kills = 'leaving a spare source alone on a two-source level (THIS is the 74-level bug)'
+  },
   @{
     file = 'app/tutorial.ts'
     from = '    if (n.x === to.x && n.y === to.y) return to.inPorts.includes(opposite(d))'
