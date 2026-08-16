@@ -232,11 +232,31 @@ export function nextHint(input: CoachInput): Hint | null {
     }
   }
 
-  if (status === 'timeout') {
+  /**
+   * A run that ended on the tick limit.
+   *
+   * "Nothing reached the sink" was read off the *target* count alone, so a
+   * board that ran beautifully and delivered the wrong item for 300 ticks was
+   * told nothing arrived — while the player had just watched some 293 items go
+   * in. Both halves of that sentence were wrong, and the second half sent them
+   * hunting for a break in a line that has none.
+   *
+   * It also returned before the board-shape checks, so the honest answer one
+   * rung below ("nothing on the board makes gadget yet — you need an
+   * assembler") did not appear until the next edit. On a belt-only run that was
+   * wrong on 204 of 204 pool levels. So when the board cannot make the target
+   * at all, say nothing here and let the rungs below explain it properly.
+   */
+  const cannotMakeTarget = !makeableNow(level, built).has(target)
+  if (status === 'timeout' && !cannotMakeTarget) {
     const delivered = snapshot.delivered[target] ?? 0
-    return delivered === 0
-      ? { id: 'timeout-none', tone: 'problem', text: `Time ran out and nothing reached the sink. Follow the line from the source and find where it stops.` }
-      : { id: 'timeout-some', tone: 'problem', text: `Time ran out at ${delivered} of ${level.target.count}. The factory works — it is just too slow.` }
+    if (delivered > 0) {
+      return { id: 'timeout-some', tone: 'problem', text: `Time ran out at ${delivered} of ${level.target.count}. The factory works — it is just too slow.` }
+    }
+    const anything = Object.values(snapshot.delivered ?? {}).reduce((sum, n) => sum + (n ?? 0), 0)
+    return anything > 0
+      ? { id: 'timeout-wrong-item', tone: 'problem', text: `Time ran out. The sink is taking items, but none of them are ${target} — follow the line back and find where the wrong thing gets in.` }
+      : { id: 'timeout-none', tone: 'problem', text: 'Time ran out and nothing reached the sink. Follow the line from the source and find where it stops.' }
   }
 
   if (built.length === 0) {
@@ -251,7 +271,7 @@ export function nextHint(input: CoachInput): Hint | null {
   // What am I even building? Worth saying before any wiring advice — and worth
   // re-checking as machines go down, because a board can be perfectly wired and
   // still incapable of making the thing the sink is asking for.
-  if (!makeableNow(level, built).has(target)) {
+  if (cannotMakeTarget) {
     const missing = missingMachine(level, built)
     const advice = recipeAdvice(level)
     if (missing !== null) {
@@ -375,6 +395,19 @@ export function nextHint(input: CoachInput): Hint | null {
       tone: 'problem',
       at: posOf(orphan),
       text: 'That belt has nothing feeding it, so nothing will ever travel along it. Join it up to the line behind it.',
+    }
+  }
+
+  // Only a timeout can reach here without winning: `won`, `running` and
+  // `jammed` all returned above, and the timeout branch deliberately falls
+  // through when the board cannot make the target. If none of the rungs found
+  // anything to say about the shape of the board, "press Run" is still the one
+  // thing that must not be said to someone who just did.
+  if (status === 'timeout') {
+    return {
+      id: 'timeout-unexplained',
+      tone: 'problem',
+      text: `Time ran out with no ${target} delivered, and the line looks joined up — so something on it is not making what the next building wants.`,
     }
   }
 
