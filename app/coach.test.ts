@@ -451,3 +451,50 @@ describe('a board that wins is never called broken', () => {
     expect(mergerBoards).toBeGreaterThan(0)
   }, 180_000)
 })
+
+describe('a gap in the middle of the line', () => {
+  /**
+   * Every rung before these checked one end or the other — sources hand
+   * something on, machine inputs are fed, the sink has a feeder. None checked
+   * that a building's output arrives anywhere. So a run with one cell missing
+   * from the middle satisfied all of them, and the player was told "Everything
+   * is connected. Press Run" over a factory that delivered nothing in 300
+   * ticks. Measured on real pool solutions: 14 of 29 boards.
+   */
+  it('is not "everything is connected", on real pool solutions', () => {
+    let checked = 0
+    for (let i = 0; i < 10; i += 1) {
+      const level = pool[i]
+      const outcome = solve(level, i + 1, { ...DEFAULT_SEARCH_LIMITS, timeoutMs: 4000 })
+      if (outcome.cheapest === null) continue
+      const full = outcome.cheapest.solution.placements
+      if (!simulate(level, { level_id: level.id, placements: full }).won) continue
+
+      for (let k = 0; k < full.length; k += 1) {
+        if (full[k].type !== 'conveyor') continue
+        const gapped = full.filter((_, j) => j !== k)
+        const built = createWorld(level, { level_id: level.id, placements: gapped })
+        if (!built.ok) continue
+        if (simulate(level, { level_id: level.id, placements: gapped }).won) continue
+        checked += 1
+        const hint = ask(level, gapped)
+        expect(hint?.id, `${level.id}: ${hint?.text}`).not.toBe('ready')
+        break
+      }
+    }
+    expect(checked).toBeGreaterThan(5)
+  }, 120_000)
+
+  it('names the building the items stop at', () => {
+    const level = makeLevel({ target: { type: 'circle', count: 5 }, recipes: {} })
+    // A run that reaches the sink, plus a stub going nowhere.
+    const belts: Placement[] = [
+      ...[1, 2, 3, 4, 5].map((x) => ({ type: 'conveyor' as const, pos: [x, 3] as const, in: 'W' as const, out: 'E' as const })),
+      { type: 'conveyor', pos: [2, 1], in: 'W', out: 'E' }, // fed by nothing, feeds nothing
+    ]
+    const hint = ask(level, belts)
+    expect(hint?.id).toMatch(/^dead-end-2-1|^orphan-2-1/)
+    expect(hint?.at).toEqual([2, 1])
+    expect(hint?.tone).toBe('problem')
+  })
+})

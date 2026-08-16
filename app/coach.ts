@@ -318,6 +318,40 @@ export function nextHint(input: CoachInput): Hint | null {
     }
   }
 
+  /**
+   * The gap in the middle of the line.
+   *
+   * Everything above checks one end or the other: sources hand something on,
+   * machine inputs are fed, the sink has a feeder. Nothing checked that a
+   * building's *output* arrives anywhere, or that a belt has an input — so a
+   * run with one cell missing from the middle satisfied every rung and the
+   * player was told "Everything is connected" over a factory that delivered
+   * nothing in 300 ticks. Measured: delete one conveyor from a winning pool
+   * solution and 14 of 29 boards drew exactly that sentence.
+   *
+   * A dead end is checked before an orphan because it is the end the item
+   * actually reaches — following the line forwards is how anyone debugs one.
+   */
+  const deadEnd = built.find((b) => drains(snapshot, b).length === 0)
+  if (deadEnd) {
+    return {
+      id: `dead-end-${deadEnd.x}-${deadEnd.y}`,
+      tone: 'problem',
+      at: posOf(deadEnd),
+      text: `${opening(name(deadEnd))} has nowhere to hand anything on. Its output has to face the next building, and that building has to face back.`,
+    }
+  }
+
+  const orphan = built.find((b) => b.type === 'conveyor' && feeds(snapshot, b).length === 0)
+  if (orphan) {
+    return {
+      id: `orphan-${orphan.x}-${orphan.y}`,
+      tone: 'problem',
+      at: posOf(orphan),
+      text: 'That belt has nothing feeding it, so nothing will ever travel along it. Join it up to the line behind it.',
+    }
+  }
+
   return {
     id: 'ready',
     tone: 'guide',
