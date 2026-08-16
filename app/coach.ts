@@ -98,6 +98,20 @@ function name(b: BuildingSnapshot): string {
 /** Names read naturally mid-sentence and look broken at the start of one. */
 const opening = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
+/** Everything one source can turn into on its own, following presses. */
+function reachableFrom(level: Level, emits: ItemType): Set<ItemType> {
+  const press = level.recipes.press ?? {}
+  const seen = new Set<ItemType>([emits])
+  for (let grew = true; grew; ) {
+    grew = false
+    for (const type of [...seen]) {
+      const out = press[type]
+      if (out !== undefined && !seen.has(out)) { seen.add(out); grew = true }
+    }
+  }
+  return seen
+}
+
 /** How the level says the target gets made, phrased for someone who is stuck. */
 function recipeAdvice(level: Level): string | null {
   const target = level.target.type
@@ -106,9 +120,21 @@ function recipeAdvice(level: Level): string | null {
   const assembled = (level.recipes.assembler ?? []).find((r) => r.out === target)
   if (assembled) {
     const [a, b] = assembled.in
-    return a === b
-      ? `An assembler combines two ${a} into ${target} — which means splitting one line in two.`
-      : `An assembler combines ${a} and ${b} into ${target}.`
+    if (a !== b) return `An assembler combines ${a} and ${b} into ${target}.`
+
+    /**
+     * Two of the same item have to come from somewhere, and splitting one line
+     * is only the *necessary* answer when one line is all there is. 96 pool
+     * levels have two sources, and on most of them both sources press to the
+     * same assembler input — so an arm from each needs no splitter at all. The
+     * old sentence asserted the split on 73 levels where it is not entailed,
+     * which is the same mistake the idle-source hint made: a claim that is true
+     * iff the level has one source, shipped pool-wide.
+     */
+    const suppliers = level.sources.filter((s) => reachableFrom(level, s.emits).has(a)).length
+    return suppliers >= 2
+      ? `An assembler combines two ${a} into ${target}, so it needs two lines of ${a} — one from each source, or one line split in two.`
+      : `An assembler combines two ${a} into ${target} — which means splitting one line in two.`
   }
   return null
 }

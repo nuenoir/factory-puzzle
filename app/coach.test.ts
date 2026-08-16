@@ -498,3 +498,42 @@ describe('a gap in the middle of the line', () => {
     expect(hint?.tone).toBe('problem')
   })
 })
+
+describe('what it says about the recipe', () => {
+  it('only claims a split when a split is the only way', () => {
+    // One source: two of the same item genuinely can only come from splitting.
+    const single = makeLevel()
+    expect(ask(single, [{ type: 'conveyor', pos: [1, 3], in: 'W', out: 'E' }])?.text).toMatch(/splitting one line in two/i)
+  })
+
+  it('does not, when a second source can supply the other arm', () => {
+    /**
+     * 96 pool levels have two sources and on most of them both press to the
+     * same assembler input, so an arm from each needs no splitter at all. The
+     * old sentence asserted the split on 73 levels where it is not entailed —
+     * the same shape as the idle-source bug, a claim true iff there is one
+     * source, shipped pool-wide.
+     */
+    const two = makeLevel({
+      sources: [
+        { pos: [0, 3], rotation: 0, emits: 'circle' },
+        { pos: [0, 5], rotation: 0, emits: 'square' },
+      ],
+      recipes: { press: { circle: 'disc', square: 'disc' }, assembler: [{ in: ['disc', 'disc'], out: 'widget' }] },
+    })
+    const text = ask(two, [{ type: 'conveyor', pos: [1, 3], in: 'W', out: 'E' }])?.text
+    expect(text).not.toMatch(/which means splitting one line in two/i)
+    expect(text).toMatch(/one from each source/i)
+  })
+
+  it('still claims the split when only one of two sources can reach the arm', () => {
+    const lopsided = makeLevel({
+      sources: [
+        { pos: [0, 3], rotation: 0, emits: 'circle' },
+        { pos: [0, 5], rotation: 0, emits: 'brick' }, // presses to nothing useful
+      ],
+      recipes: { press: { circle: 'disc' }, assembler: [{ in: ['disc', 'disc'], out: 'widget' }] },
+    })
+    expect(ask(lopsided, [{ type: 'conveyor', pos: [1, 3], in: 'W', out: 'E' }])?.text).toMatch(/splitting one line in two/i)
+  })
+})
