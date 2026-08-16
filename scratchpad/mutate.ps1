@@ -218,7 +218,7 @@ $mutations = @(
   },
   @{
     file = 'app/coach.ts'
-    from = '  if (!makeableNow(level, built).has(target)) {'
+    from = '  if (cannotMakeTarget) {'
     to   = '  if (false) {'
     kills = 'noticing a tidily wired board that cannot make the target at all'
   },
@@ -245,6 +245,45 @@ $mutations = @(
     from = "  if (tool === 'delete' || available.includes(tool)) return tool"
     to   = '  return tool'
     kills = 'dropping a tool the level being switched to does not offer'
+  },
+  # Accessibility, now that the components can actually be rendered in a test.
+  @{
+    file = 'app/App.tsx'
+    from = "      accessibilityRole=`"button`"`n      style={({ pressed }) => ["
+    to   = '      style={({ pressed }) => ['
+    kills = 'giving the buttons a role, without which Space activates nothing'
+  },
+  @{
+    file = 'app/components/Palette.tsx'
+    from = '      accessibilitySelected={selected}'
+    to   = '      accessibilitySelected={false}'
+    kills = 'telling anyone not looking at the border which tool is in hand'
+  },
+  # "Everything is connected" over a line with a hole in it: every other rung
+  # checks one end or the other, so nothing noticed the middle.
+  @{
+    file = 'app/coach.ts'
+    from = '  const deadEnd = built.find((b) => drains(snapshot, b).length === 0)'
+    to   = '  const deadEnd = undefined'
+    kills = 'noticing a building whose output arrives nowhere (14 of 29 gapped boards)'
+  },
+  @{
+    file = 'app/coach.ts'
+    from = "  const orphan = built.find((b) => b.type === 'conveyor' && feeds(snapshot, b).length === 0)"
+    to   = '  const orphan = undefined'
+    kills = 'noticing a belt with nothing feeding it'
+  },
+  @{
+    file = 'app/coach.ts'
+    from = '    const suppliers = level.sources.filter((s) => reachableFrom(level, s.emits).has(a)).length'
+    to   = '    const suppliers = 1'
+    kills = 'checking whether a splitter is actually entailed before advising one'
+  },
+  @{
+    file = 'app/coach.ts'
+    from = "  if (status === 'timeout' && !cannotMakeTarget) {"
+    to   = "  if (status === 'timeout') {"
+    kills = 'letting the board-shape rungs explain a timeout they can explain better'
   },
   @{
     file = 'app/tutorial.ts'
