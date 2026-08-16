@@ -203,7 +203,13 @@ export function nextHint(input: CoachInput): Hint | null {
 
   if (status === 'won') {
     const over = cost - level.par
-    if (over < 0) return { id: 'won-under', tone: 'win', text: `Solved for ${cost} — ${-over} under par. Nobody had found that.` }
+    // Par is the cheapest solution the validator's bounded search *found*, and
+    // was never proven optimal — running the solver harder beats the stored par
+    // on 11 of 26 sampled pool levels, by up to 7. "Nobody had found that"
+    // turned that bound into a claim about the world, at the moment a player is
+    // most likely to believe it. Beating par is still worth saying out loud;
+    // what it means is that the generator did not find this, not that nobody could.
+    if (over < 0) return { id: 'won-under', tone: 'win', text: `Solved for ${cost} — ${-over} under par. The generator never found that one.` }
     if (over === 0) return { id: 'won-par', tone: 'win', text: `Solved at par. ${cost} exactly.` }
     return { id: 'won-over', tone: 'win', text: `Solved for ${cost}, which is +${over}. Par is ${level.par} — there is a cheaper factory in here.` }
   }
