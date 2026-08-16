@@ -319,14 +319,22 @@ foreach ($m in $mutations) {
   $path = Join-Path $root $m.file
   $original = [System.IO.File]::ReadAllText($path)
 
-  if (-not $original.Contains($m.from)) {
+  # Match against LF regardless of what is on disk. Several `from` strings span
+  # more than one line, and git hands these files back with CRLF after any
+  # checkout — so a mutation that had been killing fine would silently stop
+  # applying, and report itself as a survivor for a reason that has nothing to
+  # do with the test suite. The file is restored verbatim from `$original`
+  # afterwards, so normalising here changes nothing on disk.
+  $text = $original.Replace("`r`n", "`n")
+
+  if (-not $text.Contains($m.from)) {
     Write-Host ("[{0}/{1}] SKIP  target text not found in {2}" -f $index, $mutations.Count, $m.file) -ForegroundColor Yellow
     Write-Host ("        looking for: {0}" -f $m.from) -ForegroundColor DarkGray
     $survivors += "$($m.kills) (mutation did not apply)"
     continue
   }
 
-  [System.IO.File]::WriteAllText($path, $original.Replace($m.from, $m.to), $utf8)
+  [System.IO.File]::WriteAllText($path, $text.Replace($m.from, $m.to), $utf8)
   try {
     # npx is a .cmd shim on Windows, which Start-Process cannot launch directly.
     $proc = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'npx vitest run --reporter=dot' `
