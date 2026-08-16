@@ -333,7 +333,13 @@ export default function App() {
         <View style={styles.titleRow}>
           <Text style={styles.title}>Factory Puzzle</Text>
           {mode === 'daily' ? (
-            <Pressable testID="btn-how-to-play" onPress={replayTutorial} hitSlop={8}>
+            <Pressable
+              testID="btn-how-to-play"
+              onPress={replayTutorial}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="How to play — replay the tutorial"
+            >
               <Text style={styles.howTo}>How to play</Text>
             </Pressable>
           ) : null}
@@ -409,6 +415,10 @@ export default function App() {
             key={option.label}
             testID={`speed-${index}`}
             onPress={() => setSpeed(index)}
+            accessibilityRole="button"
+            accessibilityLabel={`Speed ${option.label}`}
+            // Which speed is current is otherwise carried by border colour alone.
+            accessibilitySelected={index === speed}
             style={({ pressed }) => [
               styles.speed,
               index === speed && styles.speedOn,
@@ -432,7 +442,13 @@ export default function App() {
               {tutorialStep?.text ?? 'That is the whole game. Today’s puzzle is bigger, but it is the same three ideas.'}
             </Text>
           </View>
-          <Pressable testID="btn-leave-tutorial" onPress={leaveTutorial} hitSlop={8}>
+          <Pressable
+            testID="btn-leave-tutorial"
+            onPress={leaveTutorial}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={tutorialStep === null ? "Play today's puzzle" : 'Skip the tutorial'}
+          >
             <Text style={styles.tutorialSkip}>{tutorialStep === null ? "Today’s puzzle" : 'Skip'}</Text>
           </Pressable>
         </View>
@@ -445,6 +461,7 @@ export default function App() {
             testID="btn-hide-hints"
             onPress={() => setHintsHidden(true)}
             hitSlop={8}
+            accessibilityRole="button"
             accessibilityLabel="Hide hints"
           >
             <Text style={styles.hintDismiss}>✕</Text>
@@ -506,6 +523,10 @@ function Button({
       testID={testID ?? `btn-${label.toLowerCase()}`}
       onPress={onPress}
       disabled={disabled}
+      // Without this, react-native-web renders a bare <div tabindex="0">: no
+      // role to announce, and none of the activation behaviour a browser gives
+      // a real button. With it the element *is* a <button type="button">.
+      accessibilityRole="button"
       style={({ pressed }) => [
         styles.button,
         primary && styles.buttonPrimary,

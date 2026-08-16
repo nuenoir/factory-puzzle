@@ -51,7 +51,13 @@ export function Palette({ available, tool, rotation, onTool, onRotate }: Palette
 
       <View style={styles.hintRow}>
         {rotatable ? (
-          <Pressable testID="rotate" onPress={onRotate} style={({ pressed }) => [styles.rotate, pressed && styles.pressed]}>
+          <Pressable
+            testID="rotate"
+            onPress={onRotate}
+            accessibilityRole="button"
+            accessibilityLabel={`Rotate, currently ${rotation} degrees`}
+            style={({ pressed }) => [styles.rotate, pressed && styles.pressed]}
+          >
             <Text style={styles.rotateLabel}>Rotate {rotation}°</Text>
           </Pressable>
         ) : null}
@@ -81,6 +87,12 @@ function Tile({ testID, label, sub, accent, selected, onPress }: TileProps) {
     <Pressable
       testID={testID}
       onPress={onPress}
+      accessibilityRole="button"
+      // The tile reads "PRESS 5" visually; spoken, the cost needs a unit or it
+      // is just a number after a word.
+      accessibilityLabel={sub === '—' ? label : `${label}, cost ${sub}`}
+      // Which tool is in hand is otherwise carried by border colour alone.
+      accessibilitySelected={selected}
       style={({ pressed }) => [
         styles.tile,
         selected && { borderColor: accent, backgroundColor: accent + '22' },
