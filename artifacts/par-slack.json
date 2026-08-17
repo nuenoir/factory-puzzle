@@ -1,0 +1,1871 @@
+{
+ "summary": {
+  "levels": 204,
+  "solved": 204,
+  "unsolvedByHarderSearch": [],
+  "unverifiedCosts": [],
+  "parBeaten": 100,
+  "parBeatenPct": 49,
+  "meanSlackOverBeaten": 1.81,
+  "meanSlackOverAll": 0.89,
+  "worst": [
+   "gen-586 day 9: par 28 -> 23 (5 under)",
+   "gen-312 day 83: par 26 -> 21 (5 under)",
+   "gen-818 day 195: par 26 -> 21 (5 under)",
+   "gen-247 day 6: par 28 -> 24 (4 under)",
+   "gen-279 day 17: par 24 -> 20 (4 under)",
+   "gen-158 day 69: par 26 -> 22 (4 under)",
+   "gen-828 day 93: par 24 -> 20 (4 under)",
+   "gen-888 day 103: par 25 -> 21 (4 under)",
+   "gen-47 day 118: par 25 -> 21 (4 under)",
+   "gen-875 day 152: par 24 -> 20 (4 under)"
+  ],
+  "slackHistogram": {
+   "1": 54,
+   "2": 25,
+   "3": 10,
+   "4": 8,
+   "5": 3
+  },
+  "wouldFallBelowDailyFloor": [],
+  "seconds": 80
+ },
+ "rows": [
+  {
+   "id": "gen-643",
+   "day": 1,
+   "par": 23,
+   "found": 24,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-204",
+   "day": 2,
+   "par": 24,
+   "found": 24,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-301",
+   "day": 3,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-551",
+   "day": 4,
+   "par": 23,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-436",
+   "day": 5,
+   "par": 30,
+   "found": 30,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-247",
+   "day": 6,
+   "par": 28,
+   "found": 24,
+   "improved": 4,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-776",
+   "day": 7,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-479",
+   "day": 8,
+   "par": 21,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-586",
+   "day": 9,
+   "par": 28,
+   "found": 23,
+   "improved": 5,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-229",
+   "day": 10,
+   "par": 24,
+   "found": 24,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-349",
+   "day": 11,
+   "par": 24,
+   "found": 24,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-918",
+   "day": 12,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-366",
+   "day": 13,
+   "par": 23,
+   "found": 20,
+   "improved": 3,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-335",
+   "day": 14,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-815",
+   "day": 15,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-472",
+   "day": 16,
+   "par": 27,
+   "found": 25,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-279",
+   "day": 17,
+   "par": 24,
+   "found": 20,
+   "improved": 4,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-153",
+   "day": 18,
+   "par": 29,
+   "found": 29,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-413",
+   "day": 19,
+   "par": 24,
+   "found": 23,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-822",
+   "day": 20,
+   "par": 30,
+   "found": 29,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-375",
+   "day": 21,
+   "par": 22,
+   "found": 21,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-233",
+   "day": 22,
+   "par": 25,
+   "found": 24,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-355",
+   "day": 23,
+   "par": 22,
+   "found": 21,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-571",
+   "day": 24,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-405",
+   "day": 25,
+   "par": 23,
+   "found": 27,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-808",
+   "day": 26,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-783",
+   "day": 27,
+   "par": 28,
+   "found": 29,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-368",
+   "day": 28,
+   "par": 28,
+   "found": 30,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-149",
+   "day": 29,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-606",
+   "day": 30,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-307",
+   "day": 31,
+   "par": 22,
+   "found": 21,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-570",
+   "day": 32,
+   "par": 24,
+   "found": 23,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-193",
+   "day": 33,
+   "par": 24,
+   "found": 22,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-353",
+   "day": 34,
+   "par": 30,
+   "found": 28,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-709",
+   "day": 35,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-560",
+   "day": 36,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-840",
+   "day": 37,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-546",
+   "day": 38,
+   "par": 21,
+   "found": 20,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-988",
+   "day": 39,
+   "par": 21,
+   "found": 20,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-392",
+   "day": 40,
+   "par": 24,
+   "found": 23,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-98",
+   "day": 41,
+   "par": 22,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-607",
+   "day": 42,
+   "par": 24,
+   "found": 24,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-686",
+   "day": 43,
+   "par": 23,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-165",
+   "day": 44,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-999",
+   "day": 45,
+   "par": 26,
+   "found": 23,
+   "improved": 3,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-682",
+   "day": 46,
+   "par": 21,
+   "found": 21,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-219",
+   "day": 47,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-563",
+   "day": 48,
+   "par": 21,
+   "found": 21,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-769",
+   "day": 49,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-860",
+   "day": 50,
+   "par": 30,
+   "found": 27,
+   "improved": 3,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-35",
+   "day": 51,
+   "par": 26,
+   "found": 26,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-114",
+   "day": 52,
+   "par": 25,
+   "found": 27,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-767",
+   "day": 53,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-771",
+   "day": 54,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-310",
+   "day": 55,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-75",
+   "day": 56,
+   "par": 22,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-610",
+   "day": 57,
+   "par": 19,
+   "found": 19,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-445",
+   "day": 58,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-331",
+   "day": 59,
+   "par": 24,
+   "found": 23,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-637",
+   "day": 60,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-641",
+   "day": 61,
+   "par": 23,
+   "found": 24,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-198",
+   "day": 62,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-949",
+   "day": 63,
+   "par": 23,
+   "found": 20,
+   "improved": 3,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-909",
+   "day": 64,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-791",
+   "day": 65,
+   "par": 23,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-63",
+   "day": 66,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-734",
+   "day": 67,
+   "par": 19,
+   "found": 19,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-764",
+   "day": 68,
+   "par": 18,
+   "found": 18,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-158",
+   "day": 69,
+   "par": 26,
+   "found": 22,
+   "improved": 4,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-111",
+   "day": 70,
+   "par": 23,
+   "found": 24,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-687",
+   "day": 71,
+   "par": 22,
+   "found": 24,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-498",
+   "day": 72,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-315",
+   "day": 73,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-601",
+   "day": 74,
+   "par": 22,
+   "found": 20,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-323",
+   "day": 75,
+   "par": 23,
+   "found": 24,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-779",
+   "day": 76,
+   "par": 29,
+   "found": 28,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-109",
+   "day": 77,
+   "par": 27,
+   "found": 27,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-598",
+   "day": 78,
+   "par": 20,
+   "found": 20,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-663",
+   "day": 79,
+   "par": 21,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-256",
+   "day": 80,
+   "par": 23,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-579",
+   "day": 81,
+   "par": 24,
+   "found": 22,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-425",
+   "day": 82,
+   "par": 23,
+   "found": 21,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-312",
+   "day": 83,
+   "par": 26,
+   "found": 21,
+   "improved": 5,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-497",
+   "day": 84,
+   "par": 28,
+   "found": 28,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-81",
+   "day": 85,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-964",
+   "day": 86,
+   "par": 20,
+   "found": 20,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-786",
+   "day": 87,
+   "par": 22,
+   "found": 21,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-699",
+   "day": 88,
+   "par": 29,
+   "found": 29,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-839",
+   "day": 89,
+   "par": 21,
+   "found": 21,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-164",
+   "day": 90,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-631",
+   "day": 91,
+   "par": 22,
+   "found": 21,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-823",
+   "day": 92,
+   "par": 22,
+   "found": 21,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-828",
+   "day": 93,
+   "par": 24,
+   "found": 20,
+   "improved": 4,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-669",
+   "day": 94,
+   "par": 21,
+   "found": 21,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-998",
+   "day": 95,
+   "par": 24,
+   "found": 22,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-512",
+   "day": 96,
+   "par": 22,
+   "found": 20,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-25",
+   "day": 97,
+   "par": 20,
+   "found": 20,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-377",
+   "day": 98,
+   "par": 24,
+   "found": 22,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-621",
+   "day": 99,
+   "par": 21,
+   "found": 21,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-238",
+   "day": 100,
+   "par": 19,
+   "found": 19,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-642",
+   "day": 101,
+   "par": 25,
+   "found": 25,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-852",
+   "day": 102,
+   "par": 22,
+   "found": 24,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-888",
+   "day": 103,
+   "par": 25,
+   "found": 21,
+   "improved": 4,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-710",
+   "day": 104,
+   "par": 18,
+   "found": 18,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-833",
+   "day": 105,
+   "par": 23,
+   "found": 21,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-321",
+   "day": 106,
+   "par": 23,
+   "found": 21,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-816",
+   "day": 107,
+   "par": 18,
+   "found": 17,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-408",
+   "day": 108,
+   "par": 22,
+   "found": 21,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-277",
+   "day": 109,
+   "par": 21,
+   "found": 21,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-216",
+   "day": 110,
+   "par": 29,
+   "found": 29,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-119",
+   "day": 111,
+   "par": 23,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-792",
+   "day": 112,
+   "par": 23,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-414",
+   "day": 113,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-107",
+   "day": 114,
+   "par": 21,
+   "found": 21,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-82",
+   "day": 115,
+   "par": 23,
+   "found": 21,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-132",
+   "day": 116,
+   "par": 24,
+   "found": 22,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-222",
+   "day": 117,
+   "par": 22,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-47",
+   "day": 118,
+   "par": 25,
+   "found": 21,
+   "improved": 4,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-131",
+   "day": 119,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-384",
+   "day": 120,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-138",
+   "day": 121,
+   "par": 29,
+   "found": 29,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-299",
+   "day": 122,
+   "par": 22,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-245",
+   "day": 123,
+   "par": 23,
+   "found": 21,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-775",
+   "day": 124,
+   "par": 22,
+   "found": 21,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-831",
+   "day": 125,
+   "par": 30,
+   "found": 30,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-954",
+   "day": 126,
+   "par": 25,
+   "found": 23,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-252",
+   "day": 127,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-428",
+   "day": 128,
+   "par": 23,
+   "found": 21,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-582",
+   "day": 129,
+   "par": 24,
+   "found": 23,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-917",
+   "day": 130,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-80",
+   "day": 131,
+   "par": 25,
+   "found": 22,
+   "improved": 3,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-461",
+   "day": 132,
+   "par": 22,
+   "found": 21,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-101",
+   "day": 133,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-890",
+   "day": 134,
+   "par": 23,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-453",
+   "day": 135,
+   "par": 23,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-324",
+   "day": 136,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-540",
+   "day": 137,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-878",
+   "day": 138,
+   "par": 22,
+   "found": 24,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-352",
+   "day": 139,
+   "par": 25,
+   "found": 25,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-61",
+   "day": 140,
+   "par": 24,
+   "found": 22,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-420",
+   "day": 141,
+   "par": 24,
+   "found": 22,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-730",
+   "day": 142,
+   "par": 23,
+   "found": 20,
+   "improved": 3,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-654",
+   "day": 143,
+   "par": 23,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-981",
+   "day": 144,
+   "par": 29,
+   "found": 29,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-703",
+   "day": 145,
+   "par": 24,
+   "found": 24,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-995",
+   "day": 146,
+   "par": 26,
+   "found": 26,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-970",
+   "day": 147,
+   "par": 23,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-556",
+   "day": 148,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-510",
+   "day": 149,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-129",
+   "day": 150,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-553",
+   "day": 151,
+   "par": 23,
+   "found": 21,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-875",
+   "day": 152,
+   "par": 24,
+   "found": 20,
+   "improved": 4,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-645",
+   "day": 153,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-881",
+   "day": 154,
+   "par": 22,
+   "found": 24,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-511",
+   "day": 155,
+   "par": 19,
+   "found": 19,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-34",
+   "day": 156,
+   "par": 24,
+   "found": 21,
+   "improved": 3,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-475",
+   "day": 157,
+   "par": 24,
+   "found": 23,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-87",
+   "day": 158,
+   "par": 25,
+   "found": 23,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-401",
+   "day": 159,
+   "par": 21,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-780",
+   "day": 160,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-566",
+   "day": 161,
+   "par": 27,
+   "found": 25,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-290",
+   "day": 162,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-794",
+   "day": 163,
+   "par": 22,
+   "found": 21,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-574",
+   "day": 164,
+   "par": 22,
+   "found": 20,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-76",
+   "day": 165,
+   "par": 23,
+   "found": 24,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-429",
+   "day": 166,
+   "par": 21,
+   "found": 21,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-585",
+   "day": 167,
+   "par": 30,
+   "found": 29,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-278",
+   "day": 168,
+   "par": 21,
+   "found": 21,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-20",
+   "day": 169,
+   "par": 23,
+   "found": 20,
+   "improved": 3,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-232",
+   "day": 170,
+   "par": 21,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-647",
+   "day": 171,
+   "par": 24,
+   "found": 23,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-155",
+   "day": 172,
+   "par": 22,
+   "found": 21,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-702",
+   "day": 173,
+   "par": 22,
+   "found": 21,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-78",
+   "day": 174,
+   "par": 24,
+   "found": 22,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-936",
+   "day": 175,
+   "par": 23,
+   "found": 21,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-552",
+   "day": 176,
+   "par": 18,
+   "found": 18,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-547",
+   "day": 177,
+   "par": 24,
+   "found": 21,
+   "improved": 3,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-620",
+   "day": 178,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-651",
+   "day": 179,
+   "par": 23,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-206",
+   "day": 180,
+   "par": 24,
+   "found": 23,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-930",
+   "day": 181,
+   "par": 21,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-94",
+   "day": 182,
+   "par": 24,
+   "found": 21,
+   "improved": 3,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-341",
+   "day": 183,
+   "par": 25,
+   "found": 24,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-1",
+   "day": 184,
+   "par": 24,
+   "found": 23,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-940",
+   "day": 185,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-760",
+   "day": 186,
+   "par": 25,
+   "found": 23,
+   "improved": 2,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-419",
+   "day": 187,
+   "par": 21,
+   "found": 21,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-507",
+   "day": 188,
+   "par": 24,
+   "found": 23,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-744",
+   "day": 189,
+   "par": 21,
+   "found": 21,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-978",
+   "day": 190,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-640",
+   "day": 191,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-471",
+   "day": 192,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-768",
+   "day": 193,
+   "par": 21,
+   "found": 21,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-522",
+   "day": 194,
+   "par": 23,
+   "found": 22,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-818",
+   "day": 195,
+   "par": 26,
+   "found": 21,
+   "improved": 5,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-502",
+   "day": 196,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-443",
+   "day": 197,
+   "par": 23,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-199",
+   "day": 198,
+   "par": 25,
+   "found": 25,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-451",
+   "day": 199,
+   "par": 24,
+   "found": 25,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-684",
+   "day": 200,
+   "par": 24,
+   "found": 23,
+   "improved": 1,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-313",
+   "day": 201,
+   "par": 20,
+   "found": 23,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-492",
+   "day": 202,
+   "par": 25,
+   "found": 21,
+   "improved": 4,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-872",
+   "day": 203,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  },
+  {
+   "id": "gen-555",
+   "day": 204,
+   "par": 22,
+   "found": 22,
+   "improved": 0,
+   "verified": true,
+   "belowFloorAfter": false
+  }
+ ]
+}
