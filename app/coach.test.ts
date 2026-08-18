@@ -537,3 +537,63 @@ describe('what it says about the recipe', () => {
     expect(ask(lopsided, [{ type: 'conveyor', pos: [1, 3], in: 'W', out: 'E' }])?.text).toMatch(/splitting one line in two/i)
   })
 })
+
+describe('doing what the coach asks', () => {
+  /**
+   * Every pool target is assembled from something a press makes, so a coach
+   * that only looked at the target's own recipe ran out of things to say the
+   * moment the player placed the assembler it had asked for: the hint repeated
+   * itself verbatim minus its only actionable clause. No recipe is shown
+   * anywhere in the UI, so on those levels nothing in the game ever mentioned
+   * the press.
+   *
+   * The property worth testing is not the wording — it is that following the
+   * advice moves you on.
+   */
+  it('changes the advice, on real pool levels', () => {
+    let namedAPress = 0
+    for (let i = 0; i < 12; i += 1) {
+      const level = pool[i]
+      const belt: Placement[] = [{ type: 'conveyor', pos: [1, 3], in: 'W', out: 'E' }]
+      const first = ask(level, belt)
+      expect(first?.id, level.id).toBe('needs-an-assembler')
+
+      // Do exactly what it said.
+      const withAssembler: Placement[] = [...belt, { type: 'assembler', pos: [3, 3], rotation: 0 }]
+      const second = ask(level, withAssembler)
+
+      // The invariant: following the advice moves you on. Repeating the same
+      // sentence minus its actionable clause is the failure this exists for.
+      expect(second?.text, `${level.id} repeated itself`).not.toBe(first?.text)
+      expect(second?.id, `${level.id} fell back to the echo`).not.toBe('needs-chain')
+
+      // Where a press is still needed it has to be named, with the item it is
+      // for — which is never the target, or the sentence says one noun twice.
+      // Not every level gets here: on some the assembler recipes chain, so an
+      // assembler alone can reach the target and the coach moves to wiring.
+      if (second?.id === 'needs-a-press') {
+        namedAPress += 1
+        expect(second.text, level.id).toMatch(/you need a press to make the \w+/)
+        expect(second.text, level.id).not.toMatch(new RegExp(`press to make the ${level.target.type}[^a-z]`))
+      }
+    }
+    // If this hits zero the interesting half has quietly stopped being tested.
+    expect(namedAPress).toBeGreaterThan(4)
+  })
+
+  it('does not pad the sentence when the machine makes the target itself', () => {
+    // One press straight to the target: "a press to make the disc" would be
+    // saying the same noun twice in one sentence.
+    const level = makeLevel({ target: { type: 'disc', count: 5 } })
+    const hint = ask(level, [{ type: 'conveyor', pos: [1, 3], in: 'W', out: 'E' }])
+    expect(hint?.text).toMatch(/you need a press\./)
+    expect(hint?.text).not.toMatch(/to make the disc/)
+  })
+
+  it('asks for the machine nearest the gap, not the deepest one missing', () => {
+    // Neither machine placed: the assembler is what the target needs first,
+    // even though the press is missing too.
+    const level = makeLevel()
+    expect(ask(level, [{ type: 'conveyor', pos: [1, 3], in: 'W', out: 'E' }])?.id).toBe('needs-an-assembler')
+  })
+})

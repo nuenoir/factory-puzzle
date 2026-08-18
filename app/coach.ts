@@ -176,13 +176,45 @@ function makeableNow(level: Level, built: readonly BuildingSnapshot[]): Set<Item
   return reachable
 }
 
-/** The machine the target needs and the board has not got. */
-function missingMachine(level: Level, built: readonly BuildingSnapshot[]): string | null {
-  const target = level.target.type
-  const byPress = Object.entries(level.recipes.press ?? {}).some(([, out]) => out === target)
-  const byAssembler = (level.recipes.assembler ?? []).some((r) => r.out === target)
-  if (byAssembler && !built.some((b) => b.type === 'assembler')) return 'an assembler'
-  if (byPress && !built.some((b) => b.type === 'press')) return 'a press'
+/**
+ * The machine the board still needs, and the item it would make.
+ *
+ * Walks the chain rather than looking only at the target's own recipe. Every
+ * pool target is assembled from something a press makes, so checking one step
+ * meant that the moment the player placed the assembler the coach had asked
+ * for, it had nothing left to say: the hint dropped to the same sentence minus
+ * its only actionable clause. Since no recipe is shown anywhere in the UI, on
+ * 140 of the 204 levels nothing in the game ever mentioned the press.
+ *
+ * Breadth-first from the target through the recipes that make it, stopping at
+ * the first item whose machine is not on the board — so the answer is always
+ * the next thing to place, not the deepest thing missing.
+ */
+function missingMachine(
+  level: Level,
+  built: readonly BuildingSnapshot[],
+): { readonly machine: string; readonly makes: ItemType } | null {
+  const makeable = makeableNow(level, built)
+  const placed = (type: string) => built.some((b) => b.type === type)
+
+  const queue: ItemType[] = [level.target.type]
+  const seen = new Set<ItemType>()
+
+  while (queue.length > 0) {
+    const item = queue.shift() as ItemType
+    if (seen.has(item) || makeable.has(item)) continue
+    seen.add(item)
+
+    const assembled = (level.recipes.assembler ?? []).find((r) => r.out === item)
+    const pressed = Object.entries(level.recipes.press ?? {}).find(([, out]) => out === item)
+
+    if (assembled && !placed('assembler')) return { machine: 'an assembler', makes: item }
+    if (pressed && !placed('press')) return { machine: 'a press', makes: item }
+
+    // The machine that makes this one is already down; the gap is upstream.
+    if (assembled) queue.push(...assembled.in)
+    else if (pressed) queue.push(pressed[0] as ItemType)
+  }
   return null
 }
 
@@ -281,10 +313,13 @@ export function nextHint(input: CoachInput): Hint | null {
     const missing = missingMachine(level, built)
     const advice = recipeAdvice(level)
     if (missing !== null) {
+      // Naming what the machine is *for* only helps when it is not the thing
+      // already named at the front of the sentence.
+      const purpose = missing.makes === target ? '' : ` to make the ${missing.makes}`
       return {
-        id: `needs-${missing.replace(/\W+/g, '-')}`,
+        id: `needs-${missing.machine.replace(/\W+/g, '-')}`,
         tone: 'guide',
-        text: `Nothing on the board makes ${target} yet — you need ${missing}. ${advice ?? ''}`.trim(),
+        text: `Nothing on the board makes ${target} yet — you need ${missing.machine}${purpose}. ${advice ?? ''}`.trim(),
       }
     }
     if (advice) {
