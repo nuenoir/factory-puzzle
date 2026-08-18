@@ -8,3 +8,6 @@ docs/roadmap.md
 *.tsbuildinfo
 .DS_Store
 Thumbs.db
+
+# transient: a mutation in flight, replayed if a run is killed
+scratchpad/.mutation-in-progress.json

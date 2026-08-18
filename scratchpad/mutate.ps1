@@ -21,6 +21,30 @@ $root = Split-Path -Parent $PSScriptRoot
 $utf8 = New-Object System.Text.UTF8Encoding $false
 $timeoutSeconds = 240
 
+<#
+  Recovery for a run that was killed before it could put a file back.
+
+  Each mutation is restored in a `finally`, which covers an error or a Ctrl-C —
+  but not the process being killed outright, and a long run gets killed by
+  something eventually. When that happens a deliberate defect is left sitting in
+  the working tree, looking exactly like ordinary uncommitted work. It happened:
+  `merger: 3` was left as `merger: 0` in packages/sim/src/types.ts, which is a
+  cost table, so nothing failed to compile and nothing looked wrong.
+
+  So the original content goes to disk *before* the file is touched, and is
+  replayed on the next run. Written and read with the .NET APIs rather than
+  Get-Content/Set-Content, because the content is source and holds section signs
+  and em-dashes that a PowerShell round-trip corrupts.
+#>
+$sentinel = Join-Path $PSScriptRoot '.mutation-in-progress.json'
+if (Test-Path $sentinel) {
+  $saved = [System.IO.File]::ReadAllText($sentinel) | ConvertFrom-Json
+  [System.IO.File]::WriteAllText($saved.path, $saved.original, $utf8)
+  Remove-Item $sentinel -Force
+  Write-Host ("Recovered {0} from an interrupted run." -f $saved.file) -ForegroundColor Yellow
+  Write-Host ''
+}
+
 # Each mutation: the file, a literal to find, what to replace it with, and the
 # behaviour it is meant to destroy.
 $mutations = @(
@@ -246,6 +270,13 @@ $mutations = @(
     to   = '  return tool'
     kills = 'dropping a tool the level being switched to does not offer'
   },
+  # The coach ran out of things to say the moment the player did what it asked.
+  @{
+    file = 'app/coach.ts'
+    from = "    if (assembled) queue.push(...assembled.in)`n    else if (pressed) queue.push(pressed[0] as ItemType)"
+    to   = '    return null'
+    kills = 'following the chain past the target to the machine actually missing'
+  },
   # Accessibility, now that the components can actually be rendered in a test.
   @{
     file = 'app/App.tsx'
@@ -334,6 +365,9 @@ foreach ($m in $mutations) {
     continue
   }
 
+  # On disk before the source is touched, so a kill mid-run is recoverable.
+  $record = @{ path = $path; file = $m.file; original = $original } | ConvertTo-Json
+  [System.IO.File]::WriteAllText($sentinel, $record, $utf8)
   [System.IO.File]::WriteAllText($path, $text.Replace($m.from, $m.to), $utf8)
   try {
     # npx is a .cmd shim on Windows, which Start-Process cannot launch directly.
@@ -359,6 +393,7 @@ foreach ($m in $mutations) {
   } finally {
     # Restore before anything else can go wrong, always.
     [System.IO.File]::WriteAllText($path, $original, $utf8)
+    Remove-Item $sentinel -Force -ErrorAction SilentlyContinue
   }
 }
 
